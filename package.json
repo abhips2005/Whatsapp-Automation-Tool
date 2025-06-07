@@ -9,7 +9,7 @@
     "broadcast": "bun run ./script/broadcast.ts",
     "mail": "bun run ./script/sent-mail.ts",
     "api": "bun run ./api/server.ts",
-    "web": "cd web && npm run dev",
+    "web": "cd web && npm start",
     "dev": "concurrently \"bun run api\" \"bun run web\""
   },
   "devDependencies": {
