@@ -1,0 +1,8 @@
+**/*.png
+**/*.json
+**/*.csv
+**/*.zip
+**/*.pdf
+
+!certificates/resources/*
+!certificates/resources/font/*
