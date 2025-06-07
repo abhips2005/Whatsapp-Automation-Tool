@@ -2,33 +2,20 @@
 
 To install dependencies:
 
+From root folder :
 ```bash
 bun install
 ```
-
-Create .env file from .env.example
-Maybe ask Nexus lead for the env file
+From web folder :
+```bash
+npm install
+```
 
 To run:
 
-create file `data.csv` in the certificates folder
-
-and generate JSON data using `generate-data.ts`
-
-& images using `generate-image.ts` files
-
-Update the ID & `message.ts` then broadcast using `sent-mail.ts` or `broadcast.ts`
-
+From root folder :
 ```bash
-bun run generate-data
-```
-```bash
-bun run generate-image
-```
-```bash
-bun run broadcast
+bun run dev
 ```
 
-```bash
-bun run mail
-```
+
