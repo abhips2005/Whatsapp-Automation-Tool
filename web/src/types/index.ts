@@ -10,6 +10,7 @@ export interface Contact {
   github?: string;
   mentor?: string;
   project?: string;
+  [key: string]: any; // Allow dynamic properties
 }
 
 export interface DataUploadResponse {
@@ -69,6 +70,10 @@ export interface BroadcastResponse {
 // WebSocket Event Types
 export interface WebSocketEvents {
   'campaign-started': Campaign;
+  'campaign-update': {
+    campaignId: string;
+    campaign: Campaign;
+  };
   'campaign-progress': {
     campaignId: string;
     progress: Campaign['progress'];
@@ -108,10 +113,9 @@ export interface ContactFilters {
 }
 
 export interface DynamicFilterOption {
-  fieldName: string;
-  displayName: string;
-  values: string[];
-  count: number;
+  field: string;
+  label: string;
+  options: string[];
 }
 
 export interface FilterOptionsResponse {

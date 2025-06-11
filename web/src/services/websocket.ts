@@ -11,7 +11,7 @@ export class WebSocketService {
 
   private eventCallbacks: Map<keyof WebSocketEvents, Set<Function>> = new Map();
 
-  constructor(private url: string = process.env.REACT_APP_WS_URL || 'http://localhost:3001') {
+  constructor(private url: string = process.env.REACT_APP_WS_URL || 'http://localhost:5000') {
     this.initializeEventCallbacks();
   }
 
@@ -19,6 +19,7 @@ export class WebSocketService {
     // Initialize callback sets for each event type
     const eventTypes: (keyof WebSocketEvents)[] = [
       'campaign-started',
+      'campaign-update',
       'campaign-progress', 
       'campaign-completed',
       'campaign-error'
@@ -128,6 +129,11 @@ export class WebSocketService {
     this.socket.on('campaign-started', (data: WebSocketEvents['campaign-started']) => {
       console.log('📢 Campaign started:', data.id);
       this.notifyCallbacks('campaign-started', data);
+    });
+
+    this.socket.on('campaign-update', (data: WebSocketEvents['campaign-update']) => {
+      console.log('🔄 Campaign update:', data.campaignId);
+      this.notifyCallbacks('campaign-update', data);
     });
 
     this.socket.on('campaign-progress', (data: WebSocketEvents['campaign-progress']) => {

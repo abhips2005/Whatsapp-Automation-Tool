@@ -16,7 +16,7 @@ import {
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3001/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -158,6 +158,11 @@ export class ApiService {
 
   static async getWhatsAppStatus(): Promise<{ status: string; authenticated: boolean }> {
     const response = await api.get('/whatsapp/status');
+    return response.data;
+  }
+
+  static async logoutWhatsApp(): Promise<{ success: boolean; message: string }> {
+    const response = await api.post('/whatsapp/logout');
     return response.data;
   }
 

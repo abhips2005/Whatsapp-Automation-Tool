@@ -31,12 +31,15 @@ export const dataZod = z.array(z.object({
 
 // Create a simpler schema for the certificate generation that maps the fields we need
 export const simplifiedDataZod = z.array(z.object({
-    name: z.string().min(1),
-    email: z.string().email(), // Accept any valid email, not just SJCET emails
-    type: z.string().min(1),
+    name: z.string().min(1, "Name is required"),
+    email: z.string().min(1, "Email is required").refine(
+        (email) => email.includes('@') && email.includes('.'),
+        "Must be a valid email format"
+    ),
+    type: z.string().min(1, "Type/Role is required"),
     phone: z.union([z.string(), z.number()]).transform(val => String(val)).optional(),
     assignedRole: z.string().optional(),
-    year: z.union([z.string(), z.number()]).optional(),
+    year: z.union([z.string(), z.number()]).transform(val => val ? String(val) : undefined).optional(),
     branch: z.string().optional(),
     github: z.string().optional(),
     mentor: z.union([z.string(), z.object({}).passthrough()]).transform(val => {
@@ -48,7 +51,10 @@ export const simplifiedDataZod = z.array(z.object({
         return '';
     }).optional(),
     project: z.string().optional(),
-}))
+})).refine(
+    (data) => data.length > 0,
+    "At least one valid contact is required"
+)
 
 export type CertificateZod = z.infer<typeof simplifiedDataZod>
 

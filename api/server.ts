@@ -14,11 +14,15 @@ import { json2csv, csv2json } from 'json-2-csv';
 import Queue from 'bull';
 import Redis from 'ioredis';
 
+// Import modular routes
+import contactsRoutes from './routes/contacts';
+import whatsappRoutes from './routes/whatsapp';
+
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+    origin: ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -70,7 +74,10 @@ async function initializeRedis() {
 }
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
+  credentials: true
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -139,7 +146,15 @@ io.on('connection', (socket) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    services: {
+      api: 'running',
+      websocket: 'running',
+      whatsapp: 'available'
+    }
+  });
 });
 
 // Upload and analyze CSV structure (without processing)
@@ -172,7 +187,7 @@ app.post('/api/analyze-csv', upload.single('csv'), async (req, res) => {
       expectedFields: {
         name: { required: true, description: 'Full name of the person' },
         email: { required: true, description: 'Email address' },
-        phone: { required: false, description: 'Phone number' },
+        phone: { required: true, description: 'Mobile/phone number' },
         role: { required: false, description: 'Role or position' },
         year: { required: false, description: 'Year of study' },
         branch: { required: false, description: 'Branch or department' },
@@ -233,8 +248,12 @@ app.post('/api/process-csv', async (req, res) => {
         
         // Apply field mapping
         Object.entries(fieldMapping).forEach(([targetField, sourceColumn]) => {
-          if (sourceColumn && sourceColumn !== 'null' && entry[sourceColumn as string] !== undefined) {
-            mapped[targetField] = entry[sourceColumn as string];
+          if (sourceColumn && sourceColumn !== 'null' && sourceColumn !== '' && entry[sourceColumn as string] !== undefined) {
+            const value = entry[sourceColumn as string];
+            // Clean and process the value
+            if (value !== null && value !== undefined) {
+              mapped[targetField] = String(value).trim();
+            }
           }
         });
         
@@ -289,37 +308,62 @@ app.post('/api/process-csv', async (req, res) => {
     // Validate transformed data
     console.log('🔄 About to validate transformed data, sample entry:', JSON.stringify(transformedData[0] || {}, null, 2));
     
-    let validatedJson;
-    try {
-      validatedJson = simplifiedDataZod.parse(transformedData);
-      console.log('✅ Final validation passed for', validatedJson.length, 'entries');
-    } catch (finalValidationError) {
-      console.error('❌ Final validation failed:', finalValidationError);
-      
-      // Try to validate each entry individually to find the problematic ones
-      const validEntries = [];
-      const invalidEntries = [];
-      
-      for (let i = 0; i < transformedData.length; i++) {
-        try {
-          const singleEntryValidation = simplifiedDataZod.parse([transformedData[i]]);
-          validEntries.push(transformedData[i]);
-        } catch (entryError) {
-          console.error(`❌ Entry ${i} failed validation:`, JSON.stringify(transformedData[i], null, 2));
-          console.error(`❌ Error:`, entryError.message);
-          invalidEntries.push({ index: i, entry: transformedData[i], error: entryError.message });
+    let validatedJson = [];
+    
+    if (transformedData.length === 0) {
+      console.warn('⚠️ No data to validate after transformation');
+      validatedJson = [];
+    } else {
+      try {
+        validatedJson = simplifiedDataZod.parse(transformedData);
+        console.log('✅ Final validation passed for', validatedJson.length, 'entries');
+      } catch (finalValidationError) {
+        console.error('❌ Final validation failed:', finalValidationError);
+        
+        // Try to validate each entry individually to find the problematic ones
+        const validEntries = [];
+        const invalidEntries = [];
+        
+        for (let i = 0; i < transformedData.length; i++) {
+          try {
+            // Validate single entry by wrapping in array and unwrapping
+            const singleEntryArray = [transformedData[i]];
+            const validatedArray = simplifiedDataZod.parse(singleEntryArray);
+            validEntries.push(validatedArray[0]);
+          } catch (entryError) {
+            console.error(`❌ Entry ${i} failed validation:`, JSON.stringify(transformedData[i], null, 2));
+            console.error(`❌ Error:`, entryError instanceof Error ? entryError.message : 'Unknown error');
+            invalidEntries.push({ 
+              index: i, 
+              entry: transformedData[i], 
+              error: entryError instanceof Error ? entryError.message : 'Unknown error' 
+            });
+          }
+        }
+        
+        console.log(`✅ ${validEntries.length} valid entries, ❌ ${invalidEntries.length} invalid entries`);
+        validatedJson = validEntries;
+        
+        // If no valid entries, provide better error message
+        if (validEntries.length === 0) {
+          const firstError = invalidEntries[0];
+          throw new Error(`No valid entries found. First error: ${firstError?.error || 'Unknown validation error'}`);
         }
       }
-      
-      console.log(`✅ ${validEntries.length} valid entries, ❌ ${invalidEntries.length} invalid entries`);
-      validatedJson = validEntries;
     }
     
     // Store in memory and save to file
     currentData = validatedJson;
     
     // Save processed data
-    const outputPath = '../script/certificates/out.json';
+    const outputDir = path.join(process.cwd(), 'script', 'certificates');
+    const outputPath = path.join(outputDir, 'out.json');
+    
+    // Ensure directory exists
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+    
     fs.writeFileSync(outputPath, JSON.stringify(validatedJson, null, 2));
     
     // Clean up temp file
@@ -503,6 +547,49 @@ app.get('/api/whatsapp/status', (req, res) => {
   });
 });
 
+// WhatsApp logout endpoint
+app.post('/api/whatsapp/logout', async (req, res) => {
+  try {
+    console.log('🚪 WhatsApp logout requested');
+    
+    // Import WhatsApp client
+    const { client } = await import('../source/client');
+    
+    // Logout the client
+    await client.logout();
+    
+    // Reset global status
+    (global as any).whatsappQR = null;
+    (global as any).whatsappStatus = 'disconnected';
+    (global as any).whatsappAuthenticated = false;
+    
+    console.log('✅ WhatsApp logout successful');
+    
+    // Wait a bit for the logout to complete, then reinitialize
+    setTimeout(async () => {
+      try {
+        console.log('🔄 Reinitializing WhatsApp client for new QR code...');
+        client.initialize();
+      } catch (reinitError) {
+        console.error('❌ Failed to reinitialize WhatsApp client:', reinitError);
+      }
+    }, 2000);
+    
+    res.json({
+      success: true,
+      message: 'WhatsApp logged out successfully. You can now scan a new QR code.'
+    });
+    
+  } catch (error) {
+    console.error('❌ WhatsApp logout error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to logout from WhatsApp',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Get campaign status
 app.get('/api/broadcast/status/:campaignId', (req, res) => {
   const { campaignId } = req.params;
@@ -566,82 +653,11 @@ app.post('/api/certificates/generate', async (req, res) => {
 
 // Get available filter options based on current data
 app.get('/api/filter-options', (req, res) => {
-  try {
-    if (!currentData || currentData.length === 0) {
-      return res.json({
-        success: false,
-        message: 'No data available. Please upload a CSV file first.',
-        filters: []
-      });
-    }
-
-    // Get all unique values for each potential filter field
-    const filterOptions: any[] = [];
-    
-    // Get sample of data to determine available columns
-    const sampleEntry = currentData[0];
-    const availableFields = Object.keys(sampleEntry);
-    
-    // Define which fields should be treated as filters
-    const filterableFields = ['assignedRole', 'role', 'year', 'branch', 'type', 'mentor', 'project'];
-    
-    // Find which filterable fields actually exist in the data
-    const existingFilterFields = filterableFields.filter(field => 
-      availableFields.includes(field) && 
-      currentData.some(entry => entry[field] && String(entry[field]).trim().length > 0)
-    );
-    
-    // Generate filter options for each existing field
-    existingFilterFields.forEach(fieldName => {
-      const uniqueValues = [...new Set(
-        currentData
-          .map(entry => entry[fieldName])
-          .filter(value => value && String(value).trim().length > 0)
-          .map(value => String(value).trim())
-      )].sort();
-      
-      if (uniqueValues.length > 0) {
-        // Create display name for the field
-        let displayName = fieldName;
-        if (fieldName === 'assignedRole' || fieldName === 'role') {
-          displayName = 'Role';
-        } else if (fieldName === 'year') {
-          displayName = 'Year';
-        } else if (fieldName === 'branch') {
-          displayName = 'Branch';
-        } else if (fieldName === 'type') {
-          displayName = 'Type';
-        } else if (fieldName === 'mentor') {
-          displayName = 'Mentor';
-        } else if (fieldName === 'project') {
-          displayName = 'Project';
-        } else {
-          // Capitalize first letter and make it readable
-          displayName = fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
-        }
-        
-        filterOptions.push({
-          fieldName,
-          displayName,
-          values: uniqueValues,
-          count: uniqueValues.length
-        });
-      }
-    });
-    
-    res.json({
-      success: true,
-      filters: filterOptions,
-      totalContacts: currentData.length
-    });
-    
-  } catch (error) {
-    console.error('Filter options error:', error);
-    res.status(500).json({ 
-      error: 'Failed to get filter options', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
-    });
-  }
+  res.json({ 
+    success: false, 
+    message: 'Filter options are now dynamically generated from contact data',
+    filters: []
+  });
 });
 
 // Utility functions
@@ -719,8 +735,14 @@ async function processDirectBroadcast(campaignId: string, message: string, conta
   io.to(`campaign-${campaignId}`).emit('campaign-started', campaign);
 
   try {
-    // Import WhatsApp client dynamically to avoid initialization issues
-    const { client } = await import('../source/client');
+    // Import WhatsApp client and check readiness
+    const { client, waitForClient, isClientReady } = await import('../source/client');
+    
+    // Wait for client to be ready before proceeding
+    if (!isClientReady()) {
+      console.log('⏳ WhatsApp client not ready, waiting...');
+      await waitForClient(60000); // Wait up to 60 seconds
+    }
     
     // Process contacts one by one
     for (let i = 0; i < contacts.length; i++) {
@@ -754,6 +776,11 @@ async function processDirectBroadcast(campaignId: string, message: string, conta
           .replace(/\{\{role\}\}/g, contact.assignedRole || 'participant')
           .replace(/\{\{project\}\}/g, contact.project || 'N/A')
           .replace(/\{\{branch\}\}/g, contact.branch || 'N/A');
+        
+        // Check if client is still ready before sending
+        if (!isClientReady()) {
+          throw new Error('WhatsApp client disconnected during broadcast');
+        }
         
         await client.sendMessage(chatId, personalizedMessage);
         
@@ -811,8 +838,14 @@ broadcastQueue.process('send-broadcast', async (job) => {
   // Emit campaign started
   io.to(`campaign-${campaignId}`).emit('campaign-started', campaign);
 
-  // Import WhatsApp client dynamically to avoid initialization issues
-  const { client } = await import('../source/client');
+  // Import WhatsApp client and check readiness
+  const { client, waitForClient, isClientReady } = await import('../source/client');
+  
+  // Wait for client to be ready before proceeding
+  if (!isClientReady()) {
+    console.log('⏳ WhatsApp client not ready, waiting...');
+    await waitForClient(60000); // Wait up to 60 seconds
+  }
   
   // Process contacts one by one
   for (let i = 0; i < contacts.length; i++) {
@@ -846,6 +879,11 @@ broadcastQueue.process('send-broadcast', async (job) => {
         .replace(/\{\{role\}\}/g, contact.assignedRole || 'participant')
         .replace(/\{\{project\}\}/g, contact.project || 'N/A')
         .replace(/\{\{branch\}\}/g, contact.branch || 'N/A');
+      
+      // Check if client is still ready before sending
+      if (!isClientReady()) {
+        throw new Error('WhatsApp client disconnected during broadcast');
+      }
       
       await client.sendMessage(chatId, personalizedMessage);
       
@@ -882,7 +920,7 @@ broadcastQueue.process('send-broadcast', async (job) => {
 });
 } // End of broadcastQueue conditional
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 5000;
 
 // Initialize WhatsApp client
 async function initializeWhatsApp() {
@@ -892,20 +930,53 @@ async function initializeWhatsApp() {
     const { client } = await import('../source/client');
     client.initialize();
     console.log('📱 WhatsApp client initialization started');
-    console.log('📱 QR Code will be available at: http://localhost:3001/api/whatsapp/qr');
+    console.log('📱 QR Code will be available at: http://localhost:5000/api/whatsapp/qr');
   } catch (error) {
     console.error('❌ Failed to initialize WhatsApp client:', error);
   }
 }
 
 server.listen(PORT, async () => {
-  console.log(`🚀 Broadcaster API running on port ${PORT}`);
-  console.log(`📊 Dashboard will be available at http://localhost:3000`);
-  console.log(`🔌 WebSocket ready for real-time updates`);
+  console.log(`🚀 Server is running!
+📍 Port: ${PORT}
+🌐 API: http://localhost:${PORT}/api
+🔗 WebSocket: ws://localhost:${PORT}
+💻 Frontend: http://localhost:3001
+
+📁 Available Endpoints:
+   GET  /api/health
+   GET  /api/contacts
+   POST /api/contacts/analyze-csv
+   POST /api/contacts/process-csv
+   GET  /api/whatsapp/status
+   GET  /api/whatsapp/qr
+   POST /api/whatsapp/logout
+   POST /api/whatsapp/broadcast
+   GET  /api/whatsapp/campaigns
+`);
   
   // Initialize Redis connection
   await initializeRedis();
   
   // Initialize WhatsApp client
   await initializeWhatsApp();
-}); 
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('📪 SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('📪 SIGINT received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
+
+export default app; 
