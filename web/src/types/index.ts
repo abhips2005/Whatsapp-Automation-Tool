@@ -33,9 +33,7 @@ export interface Campaign {
   id: string;
   name: string;
   message: string;
-  filters?: CampaignFilters;
-  targets: Contact[];
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'paused';
+  status: 'queued' | 'running' | 'completed' | 'failed';
   progress: {
     total: number;
     sent: number;
@@ -43,8 +41,8 @@ export interface Campaign {
     errors: string[];
   };
   createdAt: string;
-  startedAt?: string | null;
-  completedAt?: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
 }
 
 export interface CampaignFilters {
