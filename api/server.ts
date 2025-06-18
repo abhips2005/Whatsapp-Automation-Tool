@@ -5,6 +5,8 @@ import { Server } from 'socket.io';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { whatsappClient, messageStatusDb } from '../source/message-tracker';
+import messageStatusRouter from './routes/message-status';
 
 // Import existing functionality
 import { dataZod, simplifiedDataZod } from '../script/validation';
@@ -455,6 +457,9 @@ app.get('/api/contacts', (req, res) => {
   });
 });
 
+// Attach the message status router for status API
+app.use('/api/message-status', messageStatusRouter);
+
 // Start broadcast campaign
 app.post('/api/broadcast/start', async (req, res) => {
   try {
@@ -783,7 +788,18 @@ async function processDirectBroadcast(campaignId: string, message: string, conta
         }
         
         await client.sendMessage(chatId, personalizedMessage);
-        
+
+        // --- Status tracking integration START ---
+        // Generate a unique messageId for tracking (if you have one, use it; else use chatId + timestamp)
+        const messageId = `${chatId}-${Date.now()}`;
+        messageStatusDb[messageId] = 'delivered';
+        whatsappClient.emit('delivered', { id: messageId });
+        io.to(`campaign-${campaignId}`).emit('status_update', {
+          messageId,
+          status: 'delivered'
+        });
+        // --- Status tracking integration END ---
+
         campaign.progress.sent++;
         
         // Emit progress update
@@ -797,6 +813,17 @@ async function processDirectBroadcast(campaignId: string, message: string, conta
         await new Promise(resolve => setTimeout(resolve, 5000));
         
       } catch (error) {
+        // --- Status tracking integration for failure START ---
+        const chatId = contact.phone ? contact.phone.toString().replace(/\D/g, "") + "@c.us" : "unknown";
+        const messageId = `${chatId}-${Date.now()}`;
+        messageStatusDb[messageId] = 'failed';
+        whatsappClient.emit('failed', { id: messageId });
+        io.to(`campaign-${campaignId}`).emit('status_update', {
+          messageId,
+          status: 'failed'
+        });
+        // --- Status tracking integration for failure END ---
+
         campaign.progress.failed++;
         campaign.progress.errors.push(`Failed to send to ${contact.name}: ${error}`);
         
@@ -886,7 +913,17 @@ broadcastQueue.process('send-broadcast', async (job) => {
       }
       
       await client.sendMessage(chatId, personalizedMessage);
-      
+
+      // --- Status tracking integration START ---
+      const messageId = `${chatId}-${Date.now()}`;
+      messageStatusDb[messageId] = 'delivered';
+      whatsappClient.emit('delivered', { id: messageId });
+      io.to(`campaign-${campaignId}`).emit('status_update', {
+        messageId,
+        status: 'delivered'
+      });
+      // --- Status tracking integration END ---
+
       campaign.progress.sent++;
       
       // Emit progress update
@@ -903,6 +940,17 @@ broadcastQueue.process('send-broadcast', async (job) => {
       await new Promise(resolve => setTimeout(resolve, 5000));
       
     } catch (error) {
+      // --- Status tracking integration for failure START ---
+      const chatId = contact.phone ? contact.phone.toString().replace(/\D/g, "") + "@c.us" : "unknown";
+      const messageId = `${chatId}-${Date.now()}`;
+      messageStatusDb[messageId] = 'failed';
+      whatsappClient.emit('failed', { id: messageId });
+      io.to(`campaign-${campaignId}`).emit('status_update', {
+        messageId,
+        status: 'failed'
+      });
+      // --- Status tracking integration for failure END ---
+
       campaign.progress.failed++;
       campaign.progress.errors.push(`Failed to send to ${contact.name}: ${error}`);
       
@@ -979,4 +1027,4 @@ process.on('SIGINT', () => {
   });
 });
 
-export default app; 
+export default app;
