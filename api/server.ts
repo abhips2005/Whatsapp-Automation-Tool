@@ -17,6 +17,7 @@ import Redis from 'ioredis';
 // Import modular routes
 import contactsRoutes from './routes/contacts';
 import whatsappRoutes from './routes/whatsapp';
+import previewRoutes from './routes/preview';
 
 const app = express();
 const server = createServer(app);
@@ -919,6 +920,8 @@ broadcastQueue.process('send-broadcast', async (job) => {
   return campaign;
 });
 } // End of broadcastQueue conditional
+
+app.use('/api/preview', previewRoutes);
 
 const PORT = process.env.PORT || 5000;
 
