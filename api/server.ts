@@ -17,7 +17,11 @@ import Redis from 'ioredis';
 // Import modular routes
 import contactsRoutes from './routes/contacts';
 import whatsappRoutes from './routes/whatsapp';
-import previewRoutes from './routes/preview';
+//<<<<<<< feature/templates
+//import templateRoutes from './routes/templates';
+//=======
+//import previewRoutes from './routes/preview';
+//>>>>>>> main
 
 const app = express();
 const server = createServer(app);
@@ -81,6 +85,9 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+//placing the route
+app.use('/api/templates', templateRoutes);
 
 // File upload configuration
 const storage = multer.diskStorage({
