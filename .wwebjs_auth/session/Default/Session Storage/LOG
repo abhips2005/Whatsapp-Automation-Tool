@@ -1,2 +1,3 @@
-2025/06/20-21:04:50.902 c658 Creating DB C:\Users\abhip\Downloads\broadcaster-main\broadcaster-main\.wwebjs_auth\session\Default\Session Storage since it was missing.
-2025/06/20-21:04:50.905 c658 Reusing MANIFEST C:\Users\abhip\Downloads\broadcaster-main\broadcaster-main\.wwebjs_auth\session\Default\Session Storage/MANIFEST-000001
+2025/06/20-21:16:10.087 adfc Reusing MANIFEST C:\Users\abhip\Downloads\broadcaster-main\broadcaster-main\.wwebjs_auth\session\Default\Session Storage/MANIFEST-000001
+2025/06/20-21:16:10.087 adfc Recovering log #3
+2025/06/20-21:16:10.087 adfc Reusing old log C:\Users\abhip\Downloads\broadcaster-main\broadcaster-main\.wwebjs_auth\session\Default\Session Storage/000003.log 
