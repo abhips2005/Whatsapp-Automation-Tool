@@ -17,14 +17,24 @@ const TemplateLibrary = () => {
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
 
   const fetchTemplates = async () => {
+    console.log("Fetching templates from ApiService.getMessageTemplates()...");
     try {
       const response = await ApiService.getMessageTemplates();
+      console.log("Response received:", response);
+
+    if (!Array.isArray(response)) {
+      console.warn("❗ Response is not an array:", response);
+    } else {
+      console.log("📦 Templates array:", response);
+    }
+
       setTemplates(response);
     } catch (err) {
       setError('Failed to load templates');
-      console.error(err);
+      console.error("❌ Error fetching templates:",err);
     } finally {
       setLoading(false);
+      console.log("✅ Finished loading templates");
     }
   };
 
@@ -50,6 +60,20 @@ const TemplateLibrary = () => {
   const handleCancel = () => {
     setShowEditor(false);
   };
+ 
+  console.log(`📋 Templates in state: (${templates.length} total)`, templates);
+
+templates.forEach((template, index) => {
+  console.log(`🧾 Template ${index + 1}:`, {
+    id: template._id, 
+    name: template.name,
+    content: template.content,
+  });
+});
+
+if (templates.length === 0) {
+  console.warn("⚠️ No templates loaded into state.");
+}
 
   return (
     <div className="p-4">
