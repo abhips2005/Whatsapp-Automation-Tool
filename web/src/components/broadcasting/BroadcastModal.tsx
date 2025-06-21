@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ApiService } from '../../services/api';
 import { DynamicFilterOption } from '../../types';
 import TemplateSelector from '../TemplateSelector';
-import TemplateEditor from '../TemplateEditor';
+import { MessagePreview } from '../MessagePreview';
 
 interface BroadcastModalProps {
   onClose: () => void;
@@ -16,6 +16,8 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
   const [filterOptions, setFilterOptions] = useState<DynamicFilterOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [previewCount, setPreviewCount] = useState(0);
+  const [sampleContact, setSampleContact] = useState<any | null>(null);
+  const [previewData, setPreviewData] = useState<{ preview: string; missingVars: string[] }>({ preview: '', missingVars: [] });
 
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   // Define MessageTemplate type (adjust fields as needed)
@@ -120,6 +122,37 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
     }
   }, [filters]);
 
+  // Fetch a sample contact whenever filters change
+  useEffect(() => {
+    const fetchSampleContact = async () => {
+      try {
+        const contactsResponse = await ApiService.getContacts(filters);
+        const contacts = contactsResponse.data || [];
+        setSampleContact(contacts[0] || null);
+      } catch (error) {
+        setSampleContact(null);
+      }
+    };
+    fetchSampleContact();
+  }, [filters]);
+
+  // Update preview whenever message or sampleContact changes
+  useEffect(() => {
+    const updatePreview = async () => {
+      if (!sampleContact) {
+        setPreviewData({ preview: '', missingVars: [] });
+        return;
+      }
+      try {
+        const data = await ApiService.getMessagePreview(message, sampleContact);
+        setPreviewData(data);
+      } catch (error) {
+        setPreviewData({ preview: '', missingVars: [] });
+      }
+    };
+    updatePreview();
+  }, [message, sampleContact]);
+
   const handleFilterChange = (field: string, value: string) => {
     setFilters(prev => ({
       ...prev,
@@ -152,7 +185,7 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
         <div className="p-6 border-b">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold text-gray-900">📤 Send Broadcast</h2>
@@ -160,14 +193,13 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600"
             >
-              ✕
+              {/* You can add an "X" icon here for close */}
+              ×
             </button>
           </div>
         </div>
-        
         <div className="p-6 overflow-y-auto flex-1">
           <div className="space-y-6">
-            
             {/* Campaign Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -185,19 +217,19 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
             {/* Template Selector */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-               Use a Message Template
+                Use a Message Template
               </label>
               <div className="space-y-2">
-              <TemplateSelector
-                 templates={templates}
-                 onTemplateSelect={(content: string) => setMessage(content)}
-              />
-              <button
-                onClick={() => setShowTemplateEditor(true)}
-                className="text-sm text-blue-600 underline hover:text-blue-800"
-             >
-               + Create New Template
-              </button>
+                <TemplateSelector
+                  templates={templates}
+                  onTemplateSelect={(content: string) => setMessage(content)}
+                />
+                <button
+                  onClick={() => setShowTemplateEditor(true)}
+                  className="text-sm text-blue-600 underline hover:text-blue-800"
+                >
+                  + Create New Template
+                </button>
               </div>
             </div>
 
@@ -288,6 +320,13 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
           </div>
         </div>
 
+        {/* Message Preview */}
+        {sampleContact && message.trim() && (
+          <div className="px-6 pb-2">
+            <MessagePreview preview={previewData.preview} missingVars={previewData.missingVars} />
+          </div>
+        )}
+
         <div className="p-6 border-t bg-gray-50 flex justify-end space-x-3">
           <button
             onClick={onClose}
@@ -304,21 +343,6 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
           </button>
         </div>
       </div>
-      {showTemplateEditor && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <TemplateEditor
-            onSave={async () => {
-              setShowTemplateEditor(false);
-              const updated = await ApiService.getMessageTemplates();
-              setTemplates(updated);
-              if (updated?.length) {
-                setMessage(updated[updated.length - 1].content);
-              }
-            }}
-            onCancel={() => setShowTemplateEditor(false)}
-          />
         </div>
-      )}
-    </div>
   );
-};
+}
