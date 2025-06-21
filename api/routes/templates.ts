@@ -18,7 +18,7 @@ router.post('/', (req, res) => {
 
   const variables = extractVariables(content);
   const newTemplate = {
-    id: uuidv4(),
+    _id: uuidv4(),
     name,
     content,
     variables,
