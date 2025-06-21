@@ -150,6 +150,14 @@ export class ApiService {
     return response.data;
   }
 
+  static async resumeCampaign(campaignId: string): Promise<void> {
+    await api.post(`/broadcast/resume/${campaignId}`);
+  }
+
+  static async cancelCampaign(campaignId: string): Promise<void> {
+    await api.post(`/broadcast/cancel/${campaignId}`);
+  }
+
   // WhatsApp Management
   static async getWhatsAppQR(): Promise<{ qrCode: string | null; status: string }> {
     const response = await api.get('/whatsapp/qr');
@@ -168,14 +176,6 @@ export class ApiService {
 
   static async pauseCampaign(campaignId: string): Promise<void> {
     await api.post(`/broadcast/pause/${campaignId}`);
-  }
-
-  static async resumeCampaign(campaignId: string): Promise<void> {
-    await api.post(`/broadcast/resume/${campaignId}`);
-  }
-
-  static async cancelCampaign(campaignId: string): Promise<void> {
-    await api.post(`/broadcast/cancel/${campaignId}`);
   }
 
   // Certificate Management
@@ -244,6 +244,12 @@ export class ApiService {
       responseType: 'blob',
     });
     
+    return response.data;
+  }
+
+  // Message Preview
+  static async getMessagePreview(template: string, contact: Record<string, any>): Promise<{ preview: string; missingVars: string[] }> {
+    const response = await api.post('/preview', { template, contact });
     return response.data;
   }
 }

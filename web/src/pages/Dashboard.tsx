@@ -26,6 +26,15 @@ export const Dashboard: React.FC = () => {
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [csvAnalysis, setCsvAnalysis] = useState<CSVAnalysisResult | null>(null);
 
+  // --- Analytics state ---
+  const [analytics, setAnalytics] = useState({
+    delivered: 0,
+    read: 0,
+    failed: 0,
+    total: 0,
+  });
+  // -----------------------
+
   // Initialize data
   useEffect(() => {
     const initializeData = async () => {
@@ -67,6 +76,36 @@ export const Dashboard: React.FC = () => {
     }
   }, [isConnected, subscribe]);
   // -----------------------------------
+
+  // --- Subscribe to campaign analytics updates ---
+  useEffect(() => {
+    if (isConnected()) {
+      // Listen for real-time analytics updates
+      const unsubscribe = subscribe('campaign_analytics' as any, (data: any) => {
+        setAnalytics({
+          delivered: data.delivered ?? 0,
+          read: data.read ?? 0,
+          failed: data.failed ?? 0,
+          total: data.total ?? 0,
+        });
+      });
+
+      // Optionally, fetch initial analytics from backend if available
+      ApiService.getCampaignAnalytics?.('').then((data: any) => {
+        if (data) {
+          setAnalytics({
+            delivered: data.delivered ?? 0,
+            read: data.read ?? 0,
+            failed: data.failed ?? 0,
+            total: data.total ?? 0,
+          });
+        }
+      }).catch(() => {});
+
+      return unsubscribe;
+    }
+  }, [isConnected, subscribe]);
+  // ------------------------------------------------
 
   // Quick Actions handlers
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,7 +177,7 @@ export const Dashboard: React.FC = () => {
 
         {/* --- Analytics Component --- */}
         <div className="mb-8">
-          <CampaignAnalytics stats={{}} />
+          <CampaignAnalytics stats={analytics} />
         </div>
         {/* -------------------------- */}
 
@@ -246,7 +285,7 @@ export const Dashboard: React.FC = () => {
         />
       )}
 
-        {showBroadcast && (
+      {showBroadcast && (
         <BroadcastModal
           onClose={() => setShowBroadcast(false)}
           onSend={handleBroadcastSend}

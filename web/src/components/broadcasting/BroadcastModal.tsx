@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../../services/api';
 import { DynamicFilterOption } from '../../types';
+//<<<<<<< feature/templates
+//import TemplateSelector from '../TemplateSelector';
+//=======
+//import { MessagePreview } from '../MessagePreview';
+//>>>>>>> main
 
 interface BroadcastModalProps {
   onClose: () => void;
@@ -14,6 +19,8 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
   const [filterOptions, setFilterOptions] = useState<DynamicFilterOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [previewCount, setPreviewCount] = useState(0);
+  const [sampleContact, setSampleContact] = useState<any | null>(null);
+  const [previewData, setPreviewData] = useState<{ preview: string; missingVars: string[] }>({ preview: '', missingVars: [] });
 
   useEffect(() => {
     const fetchFilterOptions = async () => {
@@ -88,6 +95,37 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
     }
   }, [filters]);
 
+  // Fetch a sample contact whenever filters change
+  useEffect(() => {
+    const fetchSampleContact = async () => {
+      try {
+        const contactsResponse = await ApiService.getContacts(filters);
+        const contacts = contactsResponse.data || [];
+        setSampleContact(contacts[0] || null);
+      } catch (error) {
+        setSampleContact(null);
+      }
+    };
+    fetchSampleContact();
+  }, [filters]);
+
+  // Update preview whenever message or sampleContact changes
+  useEffect(() => {
+    const updatePreview = async () => {
+      if (!sampleContact) {
+        setPreviewData({ preview: '', missingVars: [] });
+        return;
+      }
+      try {
+        const data = await ApiService.getMessagePreview(message, sampleContact);
+        setPreviewData(data);
+      } catch (error) {
+        setPreviewData({ preview: '', missingVars: [] });
+      }
+    };
+    updatePreview();
+  }, [message, sampleContact]);
+
   const handleFilterChange = (field: string, value: string) => {
     setFilters(prev => ({
       ...prev,
@@ -119,8 +157,12 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
+    //<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+//<<<<<<< feature/templates
+      //<div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
+//=======
+      //<div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+//>>>>>>> main
         <div className="p-6 border-b">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold text-gray-900">📤 Send Broadcast</h2>
@@ -133,8 +175,9 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
           </div>
         </div>
         
-        <div className="p-6 overflow-y-auto">
+        <div className="p-6 overflow-y-auto flex-1">
           <div className="space-y-6">
+            
             {/* Campaign Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -147,6 +190,14 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
                 value={campaignName}
                 onChange={(e) => setCampaignName(e.target.value)}
               />
+            </div>
+
+            {/* Template Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+               Use a Message Template
+              </label>
+              <TemplateSelector onTemplateSelect={(content: string) => setMessage(content)} />
             </div>
 
             {/* Message */}
@@ -235,6 +286,13 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
             </div>
           </div>
         </div>
+
+        {/* Message Preview */}
+        {sampleContact && message.trim() && (
+          <div className="px-6 pb-2">
+            <MessagePreview preview={previewData.preview} missingVars={previewData.missingVars} />
+          </div>
+        )}
 
         <div className="p-6 border-t bg-gray-50 flex justify-end space-x-3">
           <button
