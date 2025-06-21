@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import ApiService from '../services/api';
+import React, { useState } from 'react';
 
 interface MessageTemplate {
   _id: string;
@@ -8,31 +7,12 @@ interface MessageTemplate {
 }
 
 interface Props {
+  templates: MessageTemplate[];
   onTemplateSelect: (content: string) => void;
 }
 
-const TemplateSelector: React.FC<Props> = ({ onTemplateSelect }) => {
-  console.log("✅ TemplateSelector mounted");
-  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+const TemplateSelector: React.FC<Props> = ({ templates, onTemplateSelect }) => {
   const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      try {
-        const response = await ApiService.getMessageTemplates();
-        console.log("Loaded templates:", response);
-        setTemplates(response);
-      } catch (err) {
-        setError('Failed to load templates');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTemplates();
-  }, []);
 
   const filteredTemplates = templates.filter((t) =>
     t.name.toLowerCase().includes(search.toLowerCase())
@@ -47,9 +27,6 @@ const TemplateSelector: React.FC<Props> = ({ onTemplateSelect }) => {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-
-      {loading && <p className="text-sm text-gray-500">Loading...</p>}
-      {error && <p className="text-sm text-red-500">{error}</p>}
 
       <ul className="space-y-2">
         {filteredTemplates.map((template) => (

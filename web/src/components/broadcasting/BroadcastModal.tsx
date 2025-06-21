@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../../services/api';
 import { DynamicFilterOption } from '../../types';
-//<<<<<<< feature/templates
-//import TemplateSelector from '../TemplateSelector';
-//=======
-//import { MessagePreview } from '../MessagePreview';
-//>>>>>>> main
+import TemplateSelector from '../TemplateSelector';
+import { MessagePreview } from '../MessagePreview';
 
 interface BroadcastModalProps {
   onClose: () => void;
@@ -21,6 +18,16 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
   const [previewCount, setPreviewCount] = useState(0);
   const [sampleContact, setSampleContact] = useState<any | null>(null);
   const [previewData, setPreviewData] = useState<{ preview: string; missingVars: string[] }>({ preview: '', missingVars: [] });
+
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
+  // Define MessageTemplate type (adjust fields as needed)
+  type MessageTemplate = {
+    _id: string;
+    name: string;
+    content: string;
+  };
+  
+    const [templates, setTemplates] = useState<MessageTemplate[]>([]);
 
   useEffect(() => {
     const fetchFilterOptions = async () => {
@@ -77,6 +84,26 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
 
     fetchFilterOptions();
   }, []);
+
+  useEffect(() => {
+  const fetchTemplates = async () => {
+    try {
+      const response = await ApiService.getMessageTemplates();
+      if (Array.isArray(response)) {
+        setTemplates(response);
+      } else {
+        console.warn("Expected array, got:", response);
+        setTemplates([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch templates", err);
+      setTemplates([]);
+    }
+  };
+
+  fetchTemplates();
+}, []);
+
 
   // Update preview count when filters change
   useEffect(() => {
@@ -157,12 +184,8 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
   };
 
   return (
-    //<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-//<<<<<<< feature/templates
-      //<div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
-//=======
-      //<div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-//>>>>>>> main
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
         <div className="p-6 border-b">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold text-gray-900">📤 Send Broadcast</h2>
@@ -170,14 +193,13 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600"
             >
-              ✕
+              {/* You can add an "X" icon here for close */}
+              ×
             </button>
           </div>
         </div>
-        
         <div className="p-6 overflow-y-auto flex-1">
           <div className="space-y-6">
-            
             {/* Campaign Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -195,9 +217,20 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
             {/* Template Selector */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-               Use a Message Template
+                Use a Message Template
               </label>
-              <TemplateSelector onTemplateSelect={(content: string) => setMessage(content)} />
+              <div className="space-y-2">
+                <TemplateSelector
+                  templates={templates}
+                  onTemplateSelect={(content: string) => setMessage(content)}
+                />
+                <button
+                  onClick={() => setShowTemplateEditor(true)}
+                  className="text-sm text-blue-600 underline hover:text-blue-800"
+                >
+                  + Create New Template
+                </button>
+              </div>
             </div>
 
             {/* Message */}
@@ -310,6 +343,6 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
           </button>
         </div>
       </div>
-    </div>
+        </div>
   );
-}; 
+}
