@@ -11,6 +11,10 @@ import { CampaignsSummary } from '../components/dashboard/CampaignsSummary';
 import { FieldMappingModal } from '../components/contacts/FieldMappingModal';
 import { BroadcastModal } from '../components/broadcasting/BroadcastModal';
 
+// --- Status & Analytics imports ---
+import { CampaignAnalytics } from '../components/CampaignAnalytics';
+// ----------------------------------
+
 export const Dashboard: React.FC = () => {
   const { subscribe, isConnected } = useWebSocket();
   const { setContacts, setCampaigns, updateCampaign } = useAppActions();
@@ -21,6 +25,15 @@ export const Dashboard: React.FC = () => {
   const [showFieldMapping, setShowFieldMapping] = useState(false);
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [csvAnalysis, setCsvAnalysis] = useState<CSVAnalysisResult | null>(null);
+
+  // --- Analytics state ---
+  const [analytics, setAnalytics] = useState({
+    delivered: 0,
+    read: 0,
+    failed: 0,
+    total: 0,
+  });
+  // -----------------------
 
   // Initialize data
   useEffect(() => {
@@ -51,6 +64,48 @@ export const Dashboard: React.FC = () => {
       return unsubscribe;
     }
   }, [isConnected, subscribe, updateCampaign]);
+
+  // --- Subscribe to status updates ---
+  useEffect(() => {
+    if (isConnected()) {
+      const unsubscribe = subscribe('status_update' as any, (data: any) => {
+        // Example: update local status map if you want to show status in UI
+        // setStatusMap(prev => ({ ...prev, [data.messageId]: data.status }));
+      });
+      return unsubscribe;
+    }
+  }, [isConnected, subscribe]);
+  // -----------------------------------
+
+  // --- Subscribe to campaign analytics updates ---
+  useEffect(() => {
+    if (isConnected()) {
+      // Listen for real-time analytics updates
+      const unsubscribe = subscribe('campaign_analytics' as any, (data: any) => {
+        setAnalytics({
+          delivered: data.delivered ?? 0,
+          read: data.read ?? 0,
+          failed: data.failed ?? 0,
+          total: data.total ?? 0,
+        });
+      });
+
+      // Optionally, fetch initial analytics from backend if available
+      ApiService.getCampaignAnalytics?.('').then((data: any) => {
+        if (data) {
+          setAnalytics({
+            delivered: data.delivered ?? 0,
+            read: data.read ?? 0,
+            failed: data.failed ?? 0,
+            total: data.total ?? 0,
+          });
+        }
+      }).catch(() => {});
+
+      return unsubscribe;
+    }
+  }, [isConnected, subscribe]);
+  // ------------------------------------------------
 
   // Quick Actions handlers
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,6 +174,12 @@ export const Dashboard: React.FC = () => {
           <ContactsSummary contacts={contacts} />
           <CampaignsSummary campaigns={campaigns} />
         </div>
+
+        {/* --- Analytics Component --- */}
+        <div className="mb-8">
+          <CampaignAnalytics stats={analytics} />
+        </div>
+        {/* -------------------------- */}
 
         {/* Quick Actions */}
         <div className="card">
@@ -194,7 +255,7 @@ export const Dashboard: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      campaign.status === 'completed' ? 'bg-green-100 text-green-800' :
+                       campaign.status === 'completed' ? 'bg-green-100 text-green-800' :
                       campaign.status === 'running' ? 'bg-blue-100 text-blue-800' :
                       campaign.status === 'failed' ? 'bg-red-100 text-red-800' :
                       'bg-gray-100 text-gray-800'
@@ -232,4 +293,5 @@ export const Dashboard: React.FC = () => {
       )}
     </div>
   );
-}; 
+};
+
