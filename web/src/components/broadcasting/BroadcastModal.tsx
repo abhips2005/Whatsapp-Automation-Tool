@@ -3,6 +3,7 @@ import { ApiService } from '../../services/api';
 import { DynamicFilterOption } from '../../types';
 import TemplateSelector from '../TemplateSelector';
 import { MessagePreview } from '../MessagePreview';
+import  DocumentUpload from "../DocumentUpload"
 
 interface BroadcastModalProps {
   onClose: () => void;
@@ -18,6 +19,7 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
   const [previewCount, setPreviewCount] = useState(0);
   const [sampleContact, setSampleContact] = useState<any | null>(null);
   const [previewData, setPreviewData] = useState<{ preview: string; missingVars: string[] }>({ preview: '', missingVars: [] });
+  const [uploadedDoc, setUploadedDoc] = useState<File | null>(null);
 
   // Define MessageTemplate type (adjust fields as needed)
   type MessageTemplate = {
@@ -174,7 +176,7 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
     }));
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!message.trim()) {
       alert('Please enter a message');
       return;
@@ -195,6 +197,20 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
       campaignName: campaignName.trim(),
       filters: Object.keys(filters).length > 0 ? filters : undefined
     });
+
+    if (uploadedDoc) {
+      try {
+        const res = await ApiService.uploadDocument(uploadedDoc);
+
+        if (!res.success) {
+          console.warn('Document upload failed:', res.error || 'Unknown error');
+          alert('Broadcast sent, but document upload failed.');
+        }
+      } catch (err) {
+        console.error('Document upload error:', err);
+        alert('Broadcast sent, but document upload encountered an error.');
+      }
+    }
   };
 
   return (
@@ -261,6 +277,13 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
               <div className="text-sm text-gray-500 mt-1">
                 Characters: {message.length}
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Attach Document (optional)
+              </label>
+              <DocumentUpload file={uploadedDoc} setFile={setUploadedDoc} />
             </div>
 
             {/* Filters */}
