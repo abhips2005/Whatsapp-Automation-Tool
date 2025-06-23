@@ -24,6 +24,11 @@ const client = new Client({
     })
 });
 
+// Initialize global status
+(global as any).whatsappStatus = 'initializing';
+(global as any).whatsappAuthenticated = false;
+(global as any).whatsappQR = null;
+
 export const WA = {
     Buttons: Whatsapp.Buttons,
     List: Whatsapp.List,
@@ -39,6 +44,7 @@ export type ChatOptions = {
 // Add connection state tracking
 let isReady = false;
 let isConnecting = false;
+let isInitialized = false;
 
 client.on("auth_failure", (msg) => {
     console.error("AUTHENTICATION FAILURE", msg);
@@ -57,6 +63,7 @@ client.on("ready", () => {
     console.log("CLIENT IS READY");
     isReady = true;
     isConnecting = false;
+    isInitialized = true;
     (global as any).whatsappStatus = 'ready';
     (global as any).whatsappAuthenticated = true;
 });
@@ -66,6 +73,7 @@ client.on("qr", (qr) => {
     // Store QR code for API access
     (global as any).whatsappQR = qr;
     (global as any).whatsappStatus = 'qr_ready';
+    (global as any).whatsappAuthenticated = false;
     isReady = false;
     console.log('📱 QR Code available at: http://localhost:5000/api/whatsapp/qr');
 });
@@ -82,20 +90,22 @@ client.on("disconnected", (reason) => {
     if (reason !== 'LOGOUT') {
         console.log("Auto-reconnecting due to unexpected disconnection...");
         setTimeout(() => {
-            if (!isConnecting) {
+            if (!isConnecting && isInitialized) {
                 console.log("Attempting to reconnect...");
                 isConnecting = true;
                 client.initialize();
             }
         }, 5000);
     } else {
-        console.log("Manual logout detected - will wait for manual reinitialize");
-        // Don't auto-reinitialize on manual logout - let the API handle it
+        console.log("Manual logout detected - disconnection complete");
+        // Reset initialization state for manual logout
+        isInitialized = false;
     }
 });
 
 // Export helper functions
 export const isClientReady = () => isReady;
+export const isClientInitialized = () => isInitialized;
 export const waitForClient = async (timeout = 30000) => {
     return new Promise((resolve, reject) => {
         if (isReady) {
@@ -114,6 +124,29 @@ export const waitForClient = async (timeout = 30000) => {
             }
         }, 1000);
     });
+};
+
+// Safe reinitialize function
+export const reinitializeClient = async () => {
+    if (isConnecting) {
+        console.log('⚠️ Client already connecting, skipping reinitialize');
+        return;
+    }
+    
+    try {
+        isConnecting = true;
+        console.log('🔄 Safely reinitializing WhatsApp client...');
+        
+        // Wait a bit if client was just disconnected
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        await client.initialize();
+        console.log('✅ Client reinitialized successfully');
+    } catch (error) {
+        console.error('❌ Client reinitialize failed:', error);
+        isConnecting = false;
+        throw error;
+    }
 };
 
 export { client };

@@ -111,12 +111,26 @@ export class ApiService {
     if (filters?.branch) params.append('branch', filters.branch);
     if (filters?.search) params.append('search', filters.search);
     
+    // Add dynamic filters
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value && key !== 'role' && key !== 'year' && key !== 'branch' && key !== 'search') {
+          params.append(key, value as string);
+        }
+      });
+    }
+    
     const response = await api.get(`/contacts?${params.toString()}`);
     return response.data;
   }
 
   static async getFilterOptions(): Promise<FilterOptionsResponse> {
-    const response = await api.get('/filter-options');
+    const response = await api.get('/contacts/filter-options');
+    return response.data;
+  }
+
+  static async getContactsSummary(): Promise<any> {
+    const response = await api.get('/contacts/summary');
     return response.data;
   }
 
@@ -136,18 +150,20 @@ export class ApiService {
 
   // Campaign Management
   static async startBroadcast(request: BroadcastRequest): Promise<BroadcastResponse> {
-    const response = await api.post('/broadcast/start', request);
+    const response = await api.post('/whatsapp/broadcast', request);
     return response.data;
   }
 
   static async getCampaignStatus(campaignId: string): Promise<Campaign> {
-    const response = await api.get(`/broadcast/status/${campaignId}`);
-    return response.data;
+    const response = await api.get(`/whatsapp/campaigns/${campaignId}`);
+    // Handle both direct response and wrapped response
+    return response.data.data || response.data;
   }
 
   static async getAllCampaigns(): Promise<Campaign[]> {
-    const response = await api.get('/campaigns');
-    return response.data;
+    const response = await api.get('/whatsapp/campaigns');
+    // Handle both direct array response and wrapped response
+    return response.data.data || response.data || [];
   }
 
   static async resumeCampaign(campaignId: string): Promise<void> {

@@ -19,7 +19,6 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
   const [sampleContact, setSampleContact] = useState<any | null>(null);
   const [previewData, setPreviewData] = useState<{ preview: string; missingVars: string[] }>({ preview: '', missingVars: [] });
 
-  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   // Define MessageTemplate type (adjust fields as needed)
   type MessageTemplate = {
     _id: string;
@@ -27,54 +26,69 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
     content: string;
   };
   
-    const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
 
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
         setIsLoading(true);
         
-        // Fetch contacts to build dynamic filter options
-        const contactsResponse = await ApiService.getContacts();
-        const contacts = contactsResponse.data;
+        // First check if contacts are available
+        const contactsSummary = await ApiService.getContactsSummary();
         
-        if (!contacts || contacts.length === 0) {
+        if (!contactsSummary.success || contactsSummary.stats?.total === 0) {
           setFilterOptions([]);
           setPreviewCount(0);
           return;
         }
 
-        // Build dynamic filter options based on available data
+        // Fetch filter options from the new endpoint
+        const filterResponse = await ApiService.getFilterOptions();
+        
+        if (!filterResponse.success || !filterResponse.options) {
+          setFilterOptions([]);
+          setPreviewCount(contactsSummary.stats?.total || 0);
+          return;
+        }
+
+        // Build dynamic filter options based on backend response
         const dynamicOptions: DynamicFilterOption[] = [];
         
-        // Get all unique keys from contacts
-        const allKeys = new Set<string>();
-        contacts.forEach(contact => {
-          Object.keys(contact).forEach(key => allKeys.add(key));
+        // Prioritize common fields
+        const priorityFields = ['role', 'assignedRole', 'year', 'branch', 'project', 'type'];
+        const processedFields = new Set<string>();
+        
+        // Add priority fields first
+        priorityFields.forEach(field => {
+          if (filterResponse.options[field] && filterResponse.options[field].length > 0) {
+            dynamicOptions.push({
+              field: field,
+              label: field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1'),
+              options: filterResponse.options[field]
+            });
+            processedFields.add(field);
+          }
         });
         
-        // Build filter options for each field
-        allKeys.forEach(key => {
-          const uniqueValues = Array.from(new Set(
-            contacts
-              .map(contact => contact[key])
-              .filter(value => value && String(value).trim() !== '')
-              .map(value => String(value).trim())
-          )).sort();
-          
-          if (uniqueValues.length > 0 && uniqueValues.length <= 50) { // Limit options to prevent UI issues
-            dynamicOptions.push({
-              field: key,
-              label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1'),
-              options: uniqueValues
-            });
+        // Add other fields
+        Object.entries(filterResponse.options).forEach(([field, values]) => {
+          if (!processedFields.has(field) && Array.isArray(values) && values.length > 0 && values.length <= 50) {
+            // Skip internal fields
+            if (!['_id', 'email', 'phone', 'name'].includes(field)) {
+              dynamicOptions.push({
+                field: field,
+                label: field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1'),
+                options: values
+              });
+            }
           }
         });
 
         setFilterOptions(dynamicOptions);
-        setPreviewCount(contacts.length); // All contacts by default
+        setPreviewCount(filterResponse.totalContacts || 0);
       } catch (error) {
         console.error('Failed to fetch filter options:', error);
+        console.error('Error details:', error);
         setFilterOptions([]);
         setPreviewCount(0);
       } finally {
@@ -110,16 +124,16 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
     const updatePreviewCount = async () => {
       try {
         const contactsResponse = await ApiService.getContacts(filters);
-        setPreviewCount(contactsResponse.total || contactsResponse.data?.length || 0);
+        console.log('Preview count response:', contactsResponse);
+        setPreviewCount(contactsResponse.total || contactsResponse.totalContacts || contactsResponse.data?.length || 0);
       } catch (error) {
         console.error('Failed to update preview count:', error);
+        console.error('Error details:', error);
         setPreviewCount(0);
       }
     };
 
-    if (Object.keys(filters).length > 0) {
-      updatePreviewCount();
-    }
+    updatePreviewCount(); // Always update, even with no filters
   }, [filters]);
 
   // Fetch a sample contact whenever filters change
@@ -225,7 +239,7 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
                   onTemplateSelect={(content: string) => setMessage(content)}
                 />
                 <button
-                  onClick={() => setShowTemplateEditor(true)}
+                  onClick={() => alert('Template editor coming soon!')}
                   className="text-sm text-blue-600 underline hover:text-blue-800"
                 >
                   + Create New Template

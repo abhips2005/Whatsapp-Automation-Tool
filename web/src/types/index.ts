@@ -95,11 +95,13 @@ export interface ApiResponse<T = any> {
 export interface ContactsResponse {
   data: Contact[];
   total: number;
+  totalContacts: number;
   breakdown: {
     roles: Record<string, number>;
     years: Record<string, number>;
     branches: Record<string, number>;
   };
+  availableFields: string[];
 }
 
 // Filter and Search Types
@@ -108,6 +110,7 @@ export interface ContactFilters {
   year?: string;
   branch?: string;
   search?: string;
+  [key: string]: string | undefined; // Allow dynamic filters
 }
 
 export interface DynamicFilterOption {
@@ -118,8 +121,9 @@ export interface DynamicFilterOption {
 
 export interface FilterOptionsResponse {
   success: boolean;
-  filters: DynamicFilterOption[];
-  totalContacts?: number;
+  options: Record<string, string[]>;
+  totalContacts: number;
+  commonFields: string[];
   message?: string;
 }
 

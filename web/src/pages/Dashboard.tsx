@@ -45,9 +45,13 @@ export const Dashboard: React.FC = () => {
         ]);
         
         setContacts(contactsData.data);
-        setCampaigns(campaignsData || []);
+        // Ensure campaigns is always an array
+        setCampaigns(Array.isArray(campaignsData) ? campaignsData : []);
       } catch (error) {
         console.error('Failed to initialize data:', error);
+        // Set empty arrays on error
+        setContacts([]);
+        setCampaigns([]);
       }
     };
 
@@ -148,7 +152,7 @@ export const Dashboard: React.FC = () => {
       
       // Refresh campaigns
       const campaignsData = await ApiService.getAllCampaigns();
-      setCampaigns(campaignsData || []);
+      setCampaigns(Array.isArray(campaignsData) ? campaignsData : []);
     } catch (error) {
       console.error('Broadcast failed:', error);
       alert('Failed to start broadcast. Please try again.');

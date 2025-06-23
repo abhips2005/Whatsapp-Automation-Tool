@@ -1,0 +1,24 @@
+[
+  {
+    "_id": "3d7689d7-4efa-4d39-84da-7627ba429725",
+    "name": "Welcome Message",
+    "content": "Hello {{name}}, welcome to our program! Your role is {{role}}.",
+    "variables": [
+      "name",
+      "role"
+    ],
+    "createdAt": "2025-06-22T17:48:34.495Z"
+  },
+  {
+    "_id": "d25f78ca-9caa-4b12-bd45-793cea762af4",
+    "name": "Event Invitation",
+    "content": "Hi {{name}}, you are invited to join {{event}} on {{date}}. Your branch {{branch}} is participating!",
+    "variables": [
+      "name",
+      "event",
+      "date",
+      "branch"
+    ],
+    "createdAt": "2025-06-22T17:48:34.495Z"
+  }
+]

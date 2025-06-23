@@ -17,13 +17,10 @@ import Queue from 'bull';
 import Redis from 'ioredis';
 
 // Import modular routes
-import contactsRoutes from './routes/contacts';
+import contactsRoutes, { getCurrentContacts, setCurrentContacts } from './routes/contacts';
 import whatsappRoutes from './routes/whatsapp';
-//<<<<<<< feature/templates
-//import templateRoutes from './routes/templates';
-//=======
-//import previewRoutes from './routes/preview';
-//>>>>>>> main
+import templateRoutes from './routes/templates';
+import previewRoutes from './routes/preview';
 
 const app = express();
 const server = createServer(app);
@@ -90,6 +87,8 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 //placing the route
 app.use('/api/templates', templateRoutes);
+app.use('/api/contacts', contactsRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 // File upload configuration
 const storage = multer.diskStorage({
@@ -119,7 +118,9 @@ const upload = multer({
 
 // In-memory storage for campaigns and data
 let campaigns: Map<string, any> = new Map();
-let currentData: any[] = [];
+
+// Use the shared contacts data from routes/contacts.ts
+// No more separate currentData in server.ts - use getCurrentContacts() instead
 
 // Socket.io connection handling with connection tracking
 let activeConnections = 0;
@@ -362,8 +363,8 @@ app.post('/api/process-csv', async (req, res) => {
       }
     }
     
-    // Store in memory and save to file
-    currentData = validatedJson;
+    // Store in memory and save to file using shared contacts
+    setCurrentContacts(validatedJson);
     
     // Save processed data
     const outputDir = path.join(process.cwd(), 'script', 'certificates');
@@ -411,7 +412,7 @@ app.post('/api/process-csv', async (req, res) => {
 app.get('/api/contacts', (req, res) => {
   const { role, year, branch, search, ...dynamicFilters } = req.query;
   
-  let filteredData = [...currentData];
+  let filteredData = [...getCurrentContacts()];
   
   // Legacy filters for backward compatibility
   if (role) {
@@ -478,7 +479,7 @@ app.post('/api/broadcast/start', async (req, res) => {
     }
 
     // Apply filters to get target audience
-    let targetContacts = [...currentData];
+    let targetContacts = [...getCurrentContacts()];
     if (filters) {
       targetContacts = applyFilters(targetContacts, filters);
     }
@@ -560,48 +561,7 @@ app.get('/api/whatsapp/status', (req, res) => {
   });
 });
 
-// WhatsApp logout endpoint
-app.post('/api/whatsapp/logout', async (req, res) => {
-  try {
-    console.log('🚪 WhatsApp logout requested');
-    
-    // Import WhatsApp client
-    const { client } = await import('../source/client');
-    
-    // Logout the client
-    await client.logout();
-    
-    // Reset global status
-    (global as any).whatsappQR = null;
-    (global as any).whatsappStatus = 'disconnected';
-    (global as any).whatsappAuthenticated = false;
-    
-    console.log('✅ WhatsApp logout successful');
-    
-    // Wait a bit for the logout to complete, then reinitialize
-    setTimeout(async () => {
-      try {
-        console.log('🔄 Reinitializing WhatsApp client for new QR code...');
-        client.initialize();
-      } catch (reinitError) {
-        console.error('❌ Failed to reinitialize WhatsApp client:', reinitError);
-      }
-    }, 2000);
-    
-    res.json({
-      success: true,
-      message: 'WhatsApp logged out successfully. You can now scan a new QR code.'
-    });
-    
-  } catch (error) {
-    console.error('❌ WhatsApp logout error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to logout from WhatsApp',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
+// WhatsApp logout endpoint is now handled by routes/whatsapp.ts
 
 // Get campaign status
 app.get('/api/broadcast/status/:campaignId', (req, res) => {
@@ -628,7 +588,7 @@ app.post('/api/certificates/generate', async (req, res) => {
   try {
     const { filters } = req.body;
     
-    let targetContacts = [...currentData];
+    let targetContacts = [...getCurrentContacts()];
     if (filters) {
       targetContacts = applyFilters(targetContacts, filters);
     }
@@ -1011,6 +971,11 @@ server.listen(PORT, async () => {
    POST /api/whatsapp/logout
    POST /api/whatsapp/broadcast
    GET  /api/whatsapp/campaigns
+   
+📱 WhatsApp Client Status:
+   - Auto-reconnects on disconnection
+   - QR codes regenerated automatically
+   - Manual logout supported
 `);
   
   // Initialize Redis connection

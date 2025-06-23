@@ -36,6 +36,27 @@ const upload = multer({
 // In-memory storage for current data
 let currentData: any[] = [];
 
+// Initialize contacts from existing data on startup
+const initializeContacts = () => {
+  const outputPath = path.join(process.cwd(), 'script', 'certificates', 'out.json');
+  
+  try {
+    if (fs.existsSync(outputPath)) {
+      const existingData = fs.readFileSync(outputPath, 'utf-8');
+      currentData = JSON.parse(existingData);
+      console.log(`📋 Loaded ${currentData.length} existing contacts from out.json`);
+    } else {
+      console.log('📋 No existing contacts found, starting with empty data');
+    }
+  } catch (error) {
+    console.error('❌ Failed to load existing contacts:', error);
+    currentData = [];
+  }
+};
+
+// Initialize on module load
+initializeContacts();
+
 // Upload and analyze CSV structure (without processing)
 router.post('/analyze-csv', upload.single('csv'), async (req, res) => {
   try {
@@ -326,10 +347,76 @@ router.get('/', (req, res) => {
   res.json({
     data: filteredData,
     total: filteredData.length,
+    totalContacts: currentData.length,
     breakdown: {
       roles: getBreakdown(filteredData, 'assignedRole'),
       years: getBreakdown(filteredData, 'year'),
       branches: getBreakdown(filteredData, 'branch')
+    },
+    availableFields: currentData.length > 0 ? Object.keys(currentData[0]) : []
+  });
+});
+
+// Get available filter options for UI
+router.get('/filter-options', (req, res) => {
+  if (currentData.length === 0) {
+    return res.json({
+      success: false,
+      message: 'No contacts available. Please upload contacts first.',
+      options: {}
+    });
+  }
+
+  const options: Record<string, Set<string>> = {};
+  
+  // Extract unique values for each field
+  currentData.forEach(contact => {
+    Object.entries(contact).forEach(([key, value]) => {
+      if (value && typeof value === 'string' && value.trim() !== '' && key !== '_id') {
+        if (!options[key]) {
+          options[key] = new Set();
+        }
+        options[key].add(String(value).trim());
+      }
+    });
+  });
+
+  // Convert Sets to sorted arrays
+  const filterOptions = Object.fromEntries(
+    Object.entries(options).map(([key, values]) => [
+      key,
+      Array.from(values).sort()
+    ])
+  );
+
+  res.json({
+    success: true,
+    totalContacts: currentData.length,
+    options: filterOptions,
+    commonFields: ['name', 'email', 'phone', 'role', 'assignedRole', 'year', 'branch', 'project']
+  });
+});
+
+// Get summary statistics
+router.get('/summary', (req, res) => {
+  if (currentData.length === 0) {
+    return res.json({
+      success: false,
+      message: 'No contacts available',
+      stats: null
+    });
+  }
+
+  res.json({
+    success: true,
+    stats: {
+      total: currentData.length,
+      breakdown: {
+        roles: getBreakdown(currentData, 'assignedRole'),
+        years: getBreakdown(currentData, 'year'),
+        branches: getBreakdown(currentData, 'branch'),
+        projects: getBreakdown(currentData, 'project')
+      }
     }
   });
 });

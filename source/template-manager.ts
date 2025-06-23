@@ -18,5 +18,6 @@ regex.lastIndex = 0;
   return Array.from(variables);
 }
 export function validateTemplateContent(content: string): boolean {
-  return typeof content === 'string' && content.length > 0 && content.includes('{{');
+  // Allow any non-empty string content, templates don't necessarily need variables
+  return typeof content === 'string' && content.trim().length > 0;
 }
