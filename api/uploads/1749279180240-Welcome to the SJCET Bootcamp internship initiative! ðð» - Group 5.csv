@@ -1,0 +1,17 @@
+What is your name?,Email,Phone number,Year of study,Which branch are you in?,What would you say your skills are?,Skill Level - User preference,Your github link (portfolio link if you're a designer),Would you like to be a mentor? (i.e. lead projects),Assigned Project,Assigned Role,Skill Level,Is designer,Remarks,Anything you'd like to tell us? (Optional)
+Aibel Bin ,,,,,,,,,Parking data,Mentor,,,,
+Alen Vincent G,alankochupally@gmail.com,918848781581,4,CSE,"UI/UX design, Frontend development",,https://aln2k4.github.io/demo_portfolio/,,Whatsapp bot,Mentor,Intermediate (Can handle new projects with new tech),Yes,Designer,"I’ve spent time learning and practicing UI/UX through personal projects, online courses, and design challenges. I’m passionate about creating intuitive and meaningful user experiences. Through this internship"
+Ihsan Bin Sajid,ihsanbinsajid@gmail.com,918589042805,2,ECS,"Frontend development, App development",Intermediate (Has worked on some projects),https://github.com/Typixal,,Parking data,Not Assigned,Beginner (Knows basics of react or some other tech),Yes,"mostly familiar and presentable projects are in python , but is currently learning react , did stumble in explaining their projects .",
+Amith Abey Stephen,amithabey13@gmail.com,919188550674,3,CSE,"Frontend development, UI/UX design",Intermediate (Has worked on some projects),www.github.com/amith-abey-stephen,,Parking data,Not Assigned,Intermediate (Can handle new projects with new tech),No,https://letsdo.vercel.app/,I am a bca student
+Joshna jojo,joshnajojo200621@gmail.com,919847781420,1,CSE,Frontend development,Beginner (Little to no experience),https://github.com/joshnajojo12,no,Parking data,Not Assigned,Beginner (Knows basics of react or some other tech),No,https://internship-task-tau-swart.vercel.app/,
+Aibel S Anickal,aibelsanickal2028@cs.sjcetpali.ac.in,918921174051,1,CSE,UI/UX design,Beginner (Little to no experience),https://github.com/AIBELSANICKAL?tab=repositories,,Parking data,Not Assigned,Beginner (Knows basics of react or some other tech),No,http://internship-task-cleq.vercel.app,
+Nandana Santhosh,nandanasanthosh2027@es.sjcetpalai.ac.in,919847256521,2,ECS,Frontend development,Beginner (Little to no experience),https://github.com/nandana-nr?tab=followers,,Parking data,Not Assigned,Beginner (Knows basics of react or some other tech),No,,
+Abhirami Balakrishnan,abhiramibalakrishnan2028@cs.sjcetpalai.ac.in,919946854166,1,CSE,Frontend development,,https://github.com/abhirami102,no,Parking data,Not Assigned,"No skills (only ai, no frameworks)",No,"Used html , css. Suggested to use any framework.",
+Judit Jeby,juditjeby2028@cs.sjcetpalai.ac.in,918592959060,1,CSE,"UI/UX design, App development",,https://github.com/JuditJeby,,Parking data,Intern,"No skills (only ai, no frameworks)",No,Used React - with the help of ai,
+Indhu Subash,indhusubash425@gmail.com,918075087864,1,CSE,"Frontend development, App development",Beginner (Little to no experience),https://github.com/IndhuSubash-2007,no,Parking data,Not Assigned,"No skills (only ai, no frameworks)",No,Used HTML. Suggested to use any framework.,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+Project,,,,,,,,,,,,,,
+Parking data,"Instead of using paper records, there could be an app to register your vehicle and mark its presence. Use location services to automatically do this",,,,,,,,,,,,,
