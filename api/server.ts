@@ -21,6 +21,7 @@ import contactsRoutes, { getCurrentContacts, setCurrentContacts } from './routes
 import whatsappRoutes from './routes/whatsapp';
 import templateRoutes from './routes/templates';
 import previewRoutes from './routes/preview';
+import documentRoutes from './routes/document';
 
 const app = express();
 const server = createServer(app);
@@ -89,7 +90,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/api/templates', templateRoutes);
 app.use('/api/contacts', contactsRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
-
+app.use('/api', documentRoutes);//Document sending
 // File upload configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {

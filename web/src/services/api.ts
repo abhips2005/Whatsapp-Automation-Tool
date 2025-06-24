@@ -92,6 +92,29 @@ export class ApiService {
     return response.data;
   }
 
+  //Document Upload
+ static async uploadDocument(file: File): Promise<{ success: boolean; filePath?: string; error?: string }> {
+    const formData = new FormData();
+    formData.append('document', file);
+
+    const response = await api.post('/upload-document', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: (e) => {
+        if (e.total) {
+          const percent = Math.round((e.loaded * 100) / e.total);
+          console.debug(`Upload Progress: ${percent}%`);
+        }
+      }
+    });
+
+    return {
+      success: true,
+      filePath: response.data?.filePath
+    };
+}
+
   // Process CSV with field mapping
   static async processCSV(tempFilePath: string, fieldMapping: Record<string, string>): Promise<DataUploadResponse> {
     const response = await api.post('/process-csv', {
