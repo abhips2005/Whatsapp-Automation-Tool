@@ -1,12 +1,31 @@
 import { Router } from 'express';
 import { client, isClientReady, waitForClient, reinitializeClient } from '../../source/client';
 import { getCurrentContacts } from './contacts';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import sharp from 'sharp';
+import Whatsapp from 'whatsapp-web.js';
 
 const router = Router();
 
 // In-memory storage for campaigns
 let campaigns: any[] = [];
 let campaignIdCounter = 1;
+
+// Multer setup for image upload (in-memory)
+const storage = multer.memoryStorage();
+const imageUpload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (/^image\/(jpeg|png|gif|webp)$/.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed (jpg, png, gif, webp)'));
+    }
+  },
+  limits: { fileSize: 16 * 1024 * 1024 }
+});
 
 // WhatsApp status endpoint
 router.get('/status', async (req, res) => {
@@ -144,76 +163,92 @@ router.get('/qr', async (req, res) => {
 });
 
 // Start broadcast campaign - REAL IMPLEMENTATION
-router.post('/broadcast', async (req, res) => {
+router.post('/broadcast', imageUpload.single('image'), async (req, res) => {
   try {
     const { message, campaignName, filters } = req.body;
-    
+    // If image is present, process and save it
+    let imageInfo = null;
+    if (req.file) {
+      const uploadPath = path.join(__dirname, '../../uploads/');
+      if (!fs.existsSync(uploadPath)) {
+        fs.mkdirSync(uploadPath, { recursive: true });
+      }
+      const originalName = req.file.originalname;
+      const ext = path.extname(originalName).toLowerCase();
+      const baseName = path.basename(originalName, ext);
+      const timestamp = Date.now();
+      let outExt = ext;
+      let outMime = req.file.mimetype;
+      let outBuffer = req.file.buffer;
+      // Compress if file is > 1MB or not already webp/jpeg
+      if (req.file.size > 1024 * 1024 || !['.jpg', '.jpeg', '.webp'].includes(ext)) {
+        outExt = '.webp';
+        outMime = 'image/webp';
+        outBuffer = await sharp(req.file.buffer)
+          .webp({ quality: 80 })
+          .toBuffer();
+      }
+      const outFileName = `${timestamp}-${baseName}${outExt}`;
+      const outFilePath = path.join(uploadPath, outFileName);
+      fs.writeFileSync(outFilePath, outBuffer);
+      imageInfo = {
+        filePath: outFilePath,
+        mimeType: outMime,
+        fileName: outFileName
+      };
+    }
     if (!message || !campaignName) {
       return res.status(400).json({ 
         error: 'Missing required fields: message and campaignName' 
       });
     }
-
-    // Check if WhatsApp client is ready
     if (!isClientReady()) {
       return res.status(400).json({ 
         error: 'WhatsApp client is not ready. Please ensure WhatsApp is connected and authenticated.' 
       });
     }
-
-    // Get contacts (filtered if filters provided)
     const allContacts = getCurrentContacts();
     let targetContacts = allContacts;
-    
-    // Apply filters if provided
     if (filters && Object.keys(filters).length > 0) {
       targetContacts = allContacts.filter(contact => {
         return Object.entries(filters).every(([fieldName, filterValue]) => {
           if (!filterValue || String(filterValue).trim() === '') {
-            return true; // No filter applied for this field
+            return true;
           }
-          
           const contactValue = contact[fieldName];
           if (!contactValue) {
-            return false; // Contact doesn't have this field
+            return false;
           }
-          
           return String(contactValue).toLowerCase().includes(String(filterValue).toLowerCase());
         });
       });
     }
-
     if (targetContacts.length === 0) {
       return res.status(400).json({ 
         error: 'No contacts found matching the specified filters' 
       });
     }
-
-    // Create campaign
     const campaignId = `campaign_${campaignIdCounter++}`;
     const campaign = {
       id: campaignId,
       name: campaignName,
       message: message,
+      image: imageInfo ? imageInfo.fileName : null,
       targets: targetContacts.length,
       status: 'running',
       progress: { sent: 0, failed: 0, total: targetContacts.length, errors: [] },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-
     campaigns.push(campaign);
-
     // Start REAL message sending process
-    processRealBroadcast(campaignId, message, targetContacts);
-
+    processRealBroadcast(campaignId, message, targetContacts, imageInfo);
     res.json({
       success: true,
       campaignId: campaignId,
       targets: targetContacts.length,
       message: `Campaign "${campaignName}" started successfully`
     });
-
   } catch (error) {
     console.error('Broadcast error:', error);
     res.status(500).json({ 
@@ -224,53 +259,38 @@ router.post('/broadcast', async (req, res) => {
 });
 
 // REAL message sending function
-async function processRealBroadcast(campaignId: string, message: string, contacts: any[]) {
+async function processRealBroadcast(campaignId: string, message: string, contacts: any[], imageInfo?: { filePath: string, mimeType: string, fileName: string } | null) {
   const campaign = campaigns.find(c => c.id === campaignId);
   if (!campaign) {
     console.error('Campaign not found:', campaignId);
     return;
   }
-
   console.log(`🚀 Starting REAL broadcast for campaign ${campaignId} with ${contacts.length} contacts`);
-
   try {
-    // Wait for client to be ready
     if (!isClientReady()) {
       console.log('⏳ WhatsApp client not ready, waiting...');
-      await waitForClient(60000); // Wait up to 60 seconds
+      await waitForClient(60000);
     }
-
-    // Process contacts one by one
     for (let i = 0; i < contacts.length; i++) {
       const contact = contacts[i];
-      
       try {
-        // Clean phone number
         let cleanPhone = contact.phone?.toString().replace(/\D/g, "");
-        
         if (!cleanPhone || cleanPhone.length === 0) {
           campaign.progress.failed++;
           campaign.progress.errors.push(`No phone number for ${contact.name}`);
           console.log(`❌ No phone number for ${contact.name}`);
           continue;
         }
-        
-        // Add country code if not present (assuming India +91)
         if (cleanPhone.length === 10) {
           cleanPhone = "91" + cleanPhone;
         }
-        
-        // Validate phone number length
         if (cleanPhone.length < 12 || cleanPhone.length > 15) {
           campaign.progress.failed++;
           campaign.progress.errors.push(`Invalid phone number for ${contact.name}: ${contact.phone}`);
           console.log(`❌ Invalid phone number for ${contact.name}: ${contact.phone}`);
           continue;
         }
-        
         const chatId = cleanPhone + "@c.us";
-        
-        // Replace message variables
         const personalizedMessage = message
           .replace(/\{\{name\}\}/g, contact.name || 'there')
           .replace(/\{\{role\}\}/g, contact.assignedRole || contact.role || 'participant')
@@ -278,38 +298,30 @@ async function processRealBroadcast(campaignId: string, message: string, contact
           .replace(/\{\{branch\}\}/g, contact.branch || 'N/A')
           .replace(/\{\{year\}\}/g, contact.year || 'N/A')
           .replace(/\{\{email\}\}/g, contact.email || 'N/A');
-        
-        // Check if client is still ready before sending
         if (!isClientReady()) {
           throw new Error('WhatsApp client disconnected during broadcast');
         }
-        
         console.log(`📱 Sending to ${contact.name} (${cleanPhone})...`);
-        
-        // SEND THE ACTUAL MESSAGE
-        await client.sendMessage(chatId, personalizedMessage);
-        
+        if (imageInfo) {
+          const imageData = fs.readFileSync(imageInfo.filePath, { encoding: 'base64' });
+          const media = new Whatsapp.MessageMedia(imageInfo.mimeType, imageData, imageInfo.fileName);
+          await client.sendMessage(chatId, media, { caption: personalizedMessage });
+        } else {
+          await client.sendMessage(chatId, personalizedMessage);
+        }
         campaign.progress.sent++;
         campaign.updatedAt = new Date().toISOString();
-        
         console.log(`✅ Message sent to ${contact.name} (${cleanPhone})`);
-        
-        // Delay between messages (3 seconds for safety)
         await new Promise(resolve => setTimeout(resolve, 3000));
-        
       } catch (error) {
         campaign.progress.failed++;
         campaign.progress.errors.push(`Failed to send to ${contact.name}: ${error}`);
-        
         console.error(`❌ Failed to send message to ${contact.name}:`, error);
       }
     }
-    
     campaign.status = 'completed';
     campaign.updatedAt = new Date().toISOString();
-    
     console.log(`🎉 Campaign ${campaignId} completed: ${campaign.progress.sent} sent, ${campaign.progress.failed} failed`);
-    
   } catch (error) {
     campaign.status = 'failed';
     campaign.updatedAt = new Date().toISOString();

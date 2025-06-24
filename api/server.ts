@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import { whatsappClient, messageStatusDb } from '../source/message-tracker';
 import messageStatusRouter from './routes/message-status';
+import imagesRouter from './routes/images';
 
 // Import existing functionality
 import { dataZod, simplifiedDataZod } from '../script/validation';
@@ -91,6 +92,7 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/contacts', contactsRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api', documentRoutes);//Document sending
+app.use('/api/images', imagesRouter);
 // File upload configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {

@@ -10,10 +10,18 @@ import { ContactsSummary } from '../components/dashboard/ContactsSummary';
 import { CampaignsSummary } from '../components/dashboard/CampaignsSummary';
 import { FieldMappingModal } from '../components/contacts/FieldMappingModal';
 import { BroadcastModal } from '../components/broadcasting/BroadcastModal';
+import ImageUpload from '../components/ImageUpload';
 
 // --- Status & Analytics imports ---
 import { CampaignAnalytics } from '../components/CampaignAnalytics';
 // ----------------------------------
+
+interface BroadcastModalProps {
+  onClose: () => void;
+  onSend: (campaignData: { message: string; campaignName: string; filters?: any; image?: File | null }) => void;
+  image: File | null;
+  setImage: (file: File | null) => void;
+}
 
 export const Dashboard: React.FC = () => {
   const { subscribe, isConnected } = useWebSocket();
@@ -25,6 +33,7 @@ export const Dashboard: React.FC = () => {
   const [showFieldMapping, setShowFieldMapping] = useState(false);
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [csvAnalysis, setCsvAnalysis] = useState<CSVAnalysisResult | null>(null);
+  const [broadcastImage, setBroadcastImage] = useState<File | null>(null);
 
   // --- Analytics state ---
   const [analytics, setAnalytics] = useState({
@@ -144,12 +153,17 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleBroadcastSend = async (campaignData: { message: string; campaignName: string; filters?: any }) => {
+  const handleBroadcastSend = async (campaignData: { message: string; campaignName: string; filters?: any; image?: File | null }) => {
     try {
-      const result = await ApiService.startBroadcast(campaignData);
+      let result;
+      if (campaignData.image) {
+        result = await ApiService.startBroadcastWithImage(campaignData);
+      } else {
+        result = await ApiService.startBroadcast(campaignData);
+      }
       setShowBroadcast(false);
+      setBroadcastImage(null);
       alert(`Campaign started! Broadcasting to ${result.targets} contacts.`);
-      
       // Refresh campaigns
       const campaignsData = await ApiService.getAllCampaigns();
       setCampaigns(Array.isArray(campaignsData) ? campaignsData : []);
@@ -291,8 +305,13 @@ export const Dashboard: React.FC = () => {
 
       {showBroadcast && (
         <BroadcastModal
-          onClose={() => setShowBroadcast(false)}
+          onClose={() => {
+            setShowBroadcast(false);
+            setBroadcastImage(null);
+          }}
           onSend={handleBroadcastSend}
+          image={broadcastImage}
+          setImage={setBroadcastImage}
         />
       )}
     </div>

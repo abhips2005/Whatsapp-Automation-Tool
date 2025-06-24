@@ -4,13 +4,16 @@ import { DynamicFilterOption } from '../../types';
 import TemplateSelector from '../TemplateSelector';
 import { MessagePreview } from '../MessagePreview';
 import  DocumentUpload from "../DocumentUpload"
+import ImageUpload from '../ImageUpload';
 
 interface BroadcastModalProps {
   onClose: () => void;
-  onSend: (campaignData: { message: string; campaignName: string; filters?: any }) => void;
+  onSend: (campaignData: { message: string; campaignName: string; filters?: any; image?: File | null }) => void;
+  image: File | null;
+  setImage: (file: File | null) => void;
 }
 
-export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend }) => {
+export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend, image, setImage }) => {
   const [message, setMessage] = useState('');
   const [campaignName, setCampaignName] = useState('');
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -195,7 +198,8 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
     onSend({
       message: message.trim(),
       campaignName: campaignName.trim(),
-      filters: Object.keys(filters).length > 0 ? filters : undefined
+      filters: Object.keys(filters).length > 0 ? filters : undefined,
+      image
     });
 
     if (uploadedDoc) {
@@ -277,6 +281,15 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
               <div className="text-sm text-gray-500 mt-1">
                 Characters: {message.length}
               </div>
+            </div>
+
+            {/* Image Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Attach Image (optional)
+              </label>
+              <ImageUpload onFileChange={setImage} previewWidth={120} previewHeight={120} />
+              {image && <p className="text-xs text-gray-500 mt-1">Image selected: {image.name}</p>}
             </div>
 
             <div>
@@ -380,6 +393,6 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
           </button>
         </div>
       </div>
-        </div>
+    </div>
   );
 }
