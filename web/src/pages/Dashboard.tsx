@@ -181,7 +181,7 @@ export const Dashboard: React.FC = () => {
 
         {/* --- Analytics Component --- */}
         <div className="mb-8">
-          <CampaignAnalytics stats={analytics} />
+          <CampaignAnalytics />
         </div>
         {/* -------------------------- */}
 

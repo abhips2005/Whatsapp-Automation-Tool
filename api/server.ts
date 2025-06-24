@@ -5,7 +5,7 @@ import { Server } from 'socket.io';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { whatsappClient, messageStatusDb } from '../source/message-tracker';
+import { messageStatusDb } from '../source/message-tracker';
 import messageStatusRouter from './routes/message-status';
 
 // Import existing functionality
@@ -756,17 +756,14 @@ async function processDirectBroadcast(campaignId: string, message: string, conta
           throw new Error('WhatsApp client disconnected during broadcast');
         }
         
-        await client.sendMessage(chatId, personalizedMessage);
-
-        // --- Status tracking integration START ---
-        // Generate a unique messageId for tracking (if you have one, use it; else use chatId + timestamp)
-        const messageId = `${chatId}-${Date.now()}`;
-        messageStatusDb[messageId] = 'delivered';
-        whatsappClient.emit('delivered', { id: messageId });
-        io.to(`campaign-${campaignId}`).emit('status_update', {
-          messageId,
-          status: 'delivered'
-        });
+        const sentMsg = await client.sendMessage(chatId, personalizedMessage);
+        if (sentMsg && sentMsg.id && sentMsg.id._serialized) {
+          messageStatusDb[sentMsg.id._serialized] = 'sent';
+          io.to(`campaign-${campaignId}`).emit('status_update', {
+            messageId: sentMsg.id._serialized,
+            status: 'sent'
+          });
+        }
         // --- Status tracking integration END ---
 
         campaign.progress.sent++;
@@ -786,7 +783,6 @@ async function processDirectBroadcast(campaignId: string, message: string, conta
         const chatId = contact.phone ? contact.phone.toString().replace(/\D/g, "") + "@c.us" : "unknown";
         const messageId = `${chatId}-${Date.now()}`;
         messageStatusDb[messageId] = 'failed';
-        whatsappClient.emit('failed', { id: messageId });
         io.to(`campaign-${campaignId}`).emit('status_update', {
           messageId,
           status: 'failed'
@@ -881,16 +877,14 @@ broadcastQueue.process('send-broadcast', async (job) => {
         throw new Error('WhatsApp client disconnected during broadcast');
       }
       
-      await client.sendMessage(chatId, personalizedMessage);
-
-      // --- Status tracking integration START ---
-      const messageId = `${chatId}-${Date.now()}`;
-      messageStatusDb[messageId] = 'delivered';
-      whatsappClient.emit('delivered', { id: messageId });
-      io.to(`campaign-${campaignId}`).emit('status_update', {
-        messageId,
-        status: 'delivered'
-      });
+      const sentMsg = await client.sendMessage(chatId, personalizedMessage);
+      if (sentMsg && sentMsg.id && sentMsg.id._serialized) {
+        messageStatusDb[sentMsg.id._serialized] = 'sent';
+        io.to(`campaign-${campaignId}`).emit('status_update', {
+          messageId: sentMsg.id._serialized,
+          status: 'sent'
+        });
+      }
       // --- Status tracking integration END ---
 
       campaign.progress.sent++;
@@ -1003,4 +997,5 @@ process.on('SIGINT', () => {
   });
 });
 
+export { io };
 export default app;
