@@ -197,6 +197,51 @@ export class ApiService {
     await api.post(`/broadcast/cancel/${campaignId}`);
   }
 
+  // Google Sheets Integration
+  static async importFromGoogleSheets(sheetUrl: string, apiKey?: string): Promise<CSVAnalysisResult> {
+    const response = await api.post('/google-sheets/import', {
+      sheetUrl,
+      apiKey
+    });
+    return response.data;
+  }
+
+  static async testGoogleSheetsConnection(sheetUrl: string, apiKey?: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    const response = await api.post('/google-sheets/test', {
+      sheetUrl,
+      apiKey
+    });
+    return response.data;
+  }
+
+  static async setupAutoSync(config: {
+    sheetUrl: string;
+    apiKey: string;
+    syncInterval: number;
+    autoMessage: boolean;
+    welcomeMessage?: string;
+    fieldMapping: Record<string, string>;
+  }): Promise<{ success: boolean; configId?: string; nextSync?: string; error?: string }> {
+    const response = await api.post('/google-sheets/setup-auto-sync', config);
+    return response.data;
+  }
+
+  static async getAutoSyncStatus(): Promise<{ 
+    success: boolean; 
+    configs: Array<{
+      id: string;
+      sheetUrl: string;
+      syncInterval: number;
+      isActive: boolean;
+      lastSync: string | null;
+      createdAt: string;
+    }>;
+    totalConfigs: number;
+  }> {
+    const response = await api.get('/google-sheets/auto-sync-status');
+    return response.data;
+  }
+
   // WhatsApp Management
   static async getWhatsAppQR(): Promise<{ qrCode: string | null; status: string }> {
     const response = await api.get('/whatsapp/qr');

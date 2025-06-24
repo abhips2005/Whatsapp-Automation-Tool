@@ -22,9 +22,46 @@ import whatsappRoutes from './routes/whatsapp';
 import templateRoutes from './routes/templates';
 import previewRoutes from './routes/preview';
 import documentRoutes from './routes/document';
+import googleSheetsRoutes from './routes/googleSheets';
 
 const app = express();
 const server = createServer(app);
+
+// Middleware
+app.use(cors({
+  origin: ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
+  credentials: true
+}));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// File upload configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = './uploads';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  }
+});
+
+const upload = multer({ 
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed'));
+    }
+  },
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
+// Socket.io setup
 const io = new Server(server, {
   cors: {
     origin: ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
@@ -35,6 +72,9 @@ const io = new Server(server, {
   pingTimeout: 60000,
   pingInterval: 25000
 });
+
+// Make io instance available globally for message status updates
+(global as any).io = io;
 
 // Redis connection for job queue with error handling
 let redis: Redis | null = null;
@@ -78,51 +118,18 @@ async function initializeRedis() {
   }
 }
 
-// Middleware
-app.use(cors({
-  origin: ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
-  credentials: true
-}));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
 //placing the route
 app.use('/api/templates', templateRoutes);
 app.use('/api/contacts', contactsRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api', documentRoutes);//Document sending
-// File upload configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = './uploads';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  }
-});
-
-const upload = multer({ 
-  storage,
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only CSV files are allowed'));
-    }
-  },
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
-});
+app.use('/api/google-sheets', googleSheetsRoutes);
 
 // In-memory storage for campaigns and data
 let campaigns: Map<string, any> = new Map();
 
 // Use the shared contacts data from routes/contacts.ts
 // No more separate currentData in server.ts - use getCurrentContacts() instead
-
 // Socket.io connection handling with connection tracking
 let activeConnections = 0;
 
@@ -967,6 +974,10 @@ server.listen(PORT, async () => {
    GET  /api/contacts
    POST /api/contacts/analyze-csv
    POST /api/contacts/process-csv
+   POST /api/google-sheets/import
+   POST /api/google-sheets/test
+   POST /api/google-sheets/setup-auto-sync  ← NEW: Auto-sync setup
+   GET  /api/google-sheets/auto-sync-status ← NEW: Auto-sync status
    GET  /api/whatsapp/status
    GET  /api/whatsapp/qr
    POST /api/whatsapp/logout

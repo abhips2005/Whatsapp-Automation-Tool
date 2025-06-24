@@ -40,6 +40,15 @@ export interface Campaign {
     failed: number;
     errors: string[];
   };
+  recipients?: Array<{
+    name: string;
+    phone: string;
+    email?: string;
+    status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+    timestamp?: string | null;
+    error?: string | null;
+    messageId?: string | null;
+  }>;
   createdAt: string;
   startedAt: string | null;
   completedAt: string | null;
@@ -177,4 +186,5 @@ export interface CSVAnalysisResult {
   tempFilePath: string;
   totalRows: number;
   expectedFields: Record<string, { required: boolean; description: string }>;
+  source?: string; // Optional field to mark the source (csv, google_sheets, etc.)
 } 

@@ -8,6 +8,50 @@ const router = Router();
 let campaigns: any[] = [];
 let campaignIdCounter = 1;
 
+// Set up message status update handler
+(global as any).onMessageStatusUpdate = (messageId: string, status: string, message: any) => {
+  try {
+    const messageMap = (global as any).messageRecipientMap;
+    if (!messageMap || !messageMap.has(messageId)) {
+      return; // Message not tracked
+    }
+    
+    const messageInfo = messageMap.get(messageId);
+    const campaign = campaigns.find(c => c.id === messageInfo.campaignId);
+    
+    if (!campaign || !campaign.recipients) {
+      return;
+    }
+    
+    // Find and update the recipient
+    const recipient = campaign.recipients.find((r: any) => 
+      r.phone === messageInfo.recipientPhone || r.name === messageInfo.recipientName
+    );
+    
+    if (recipient) {
+      const oldStatus = recipient.status;
+      recipient.status = status;
+      recipient.timestamp = new Date().toISOString();
+      
+      console.log(`📱 Updated ${recipient.name} (${recipient.phone}) status: ${oldStatus} → ${status}`);
+      
+      // Update campaign updated timestamp
+      campaign.updatedAt = new Date().toISOString();
+      
+      // Emit real-time update to WebSocket clients
+      const io = (global as any).io;
+      if (io) {
+        io.emit('campaign-update', {
+          campaignId: campaign.id,
+          campaign: campaign
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error updating message status:', error);
+  }
+};
+
 // WhatsApp status endpoint
 router.get('/status', async (req, res) => {
   try {
@@ -198,6 +242,15 @@ router.post('/broadcast', async (req, res) => {
       targets: targetContacts.length,
       status: 'running',
       progress: { sent: 0, failed: 0, total: targetContacts.length, errors: [] },
+      recipients: targetContacts.map(contact => ({
+        name: contact.name || 'Unknown',
+        phone: contact.phone || '',
+        email: contact.email || '',
+        status: 'pending',
+        timestamp: null,
+        error: null,
+        messageId: null
+      })),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -244,6 +297,11 @@ async function processRealBroadcast(campaignId: string, message: string, contact
     for (let i = 0; i < contacts.length; i++) {
       const contact = contacts[i];
       
+      // Find the recipient in the campaign
+      const recipient = campaign.recipients?.find(r => 
+        r.phone === contact.phone || r.name === contact.name
+      );
+      
       try {
         // Clean phone number
         let cleanPhone = contact.phone?.toString().replace(/\D/g, "");
@@ -251,6 +309,11 @@ async function processRealBroadcast(campaignId: string, message: string, contact
         if (!cleanPhone || cleanPhone.length === 0) {
           campaign.progress.failed++;
           campaign.progress.errors.push(`No phone number for ${contact.name}`);
+          if (recipient) {
+            recipient.status = 'failed';
+            recipient.error = 'No phone number provided';
+            recipient.timestamp = new Date().toISOString();
+          }
           console.log(`❌ No phone number for ${contact.name}`);
           continue;
         }
@@ -264,6 +327,11 @@ async function processRealBroadcast(campaignId: string, message: string, contact
         if (cleanPhone.length < 12 || cleanPhone.length > 15) {
           campaign.progress.failed++;
           campaign.progress.errors.push(`Invalid phone number for ${contact.name}: ${contact.phone}`);
+          if (recipient) {
+            recipient.status = 'failed';
+            recipient.error = `Invalid phone number: ${contact.phone}`;
+            recipient.timestamp = new Date().toISOString();
+          }
           console.log(`❌ Invalid phone number for ${contact.name}: ${contact.phone}`);
           continue;
         }
@@ -287,10 +355,26 @@ async function processRealBroadcast(campaignId: string, message: string, contact
         console.log(`📱 Sending to ${contact.name} (${cleanPhone})...`);
         
         // SEND THE ACTUAL MESSAGE
-        await client.sendMessage(chatId, personalizedMessage);
+        const messageResponse = await client.sendMessage(chatId, personalizedMessage);
         
         campaign.progress.sent++;
         campaign.updatedAt = new Date().toISOString();
+        
+        // Update recipient status and store message ID
+        if (recipient) {
+          recipient.status = 'sent';
+          recipient.timestamp = new Date().toISOString();
+          recipient.error = null;
+          recipient.messageId = messageResponse.id._serialized;
+          
+          // Store mapping for status updates
+          (global as any).messageRecipientMap = (global as any).messageRecipientMap || new Map();
+          (global as any).messageRecipientMap.set(messageResponse.id._serialized, {
+            campaignId,
+            recipientPhone: contact.phone,
+            recipientName: contact.name
+          });
+        }
         
         console.log(`✅ Message sent to ${contact.name} (${cleanPhone})`);
         
@@ -300,6 +384,13 @@ async function processRealBroadcast(campaignId: string, message: string, contact
       } catch (error) {
         campaign.progress.failed++;
         campaign.progress.errors.push(`Failed to send to ${contact.name}: ${error}`);
+        
+        // Update recipient status on failure
+        if (recipient) {
+          recipient.status = 'failed';
+          recipient.error = error instanceof Error ? error.message : 'Unknown error';
+          recipient.timestamp = new Date().toISOString();
+        }
         
         console.error(`❌ Failed to send message to ${contact.name}:`, error);
       }

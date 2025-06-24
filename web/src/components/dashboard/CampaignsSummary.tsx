@@ -2,9 +2,10 @@ import React from 'react';
 
 interface CampaignsSummaryProps {
   campaigns: any[];
+  onViewAllCampaigns?: () => void;
 }
 
-export const CampaignsSummary: React.FC<CampaignsSummaryProps> = ({ campaigns }) => {
+export const CampaignsSummary: React.FC<CampaignsSummaryProps> = ({ campaigns, onViewAllCampaigns }) => {
   const totalCampaigns = campaigns.length;
   const activeCampaigns = campaigns.filter(c => c.status === 'running').length;
   const completedCampaigns = campaigns.filter(c => c.status === 'completed').length;
@@ -52,7 +53,10 @@ export const CampaignsSummary: React.FC<CampaignsSummaryProps> = ({ campaigns })
         )}
         
         <div className="pt-3 border-t">
-          <button className="w-full text-blue-600 hover:text-blue-800 text-sm font-medium">
+          <button 
+            onClick={onViewAllCampaigns}
+            className="w-full text-blue-600 hover:text-blue-800 text-sm font-medium hover:bg-blue-50 py-2 px-3 rounded transition-colors"
+          >
             View All Campaigns →
           </button>
         </div>

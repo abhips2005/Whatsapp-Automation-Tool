@@ -103,6 +103,39 @@ client.on("disconnected", (reason) => {
     }
 });
 
+// Message status tracking for delivery and read receipts
+client.on('message_ack', (msg: any, ack: any) => {
+    try {
+        // ack values:
+        // 0 = ACK_ERROR (not sent)
+        // 1 = ACK_PENDING (clock icon - message sent)
+        // 2 = ACK_SERVER (single check - message received by WhatsApp servers)
+        // 3 = ACK_DEVICE (double check - message delivered to recipient's device)
+        // 4 = ACK_READ (double blue check - message read by recipient)
+        
+        const messageId = msg.id._serialized;
+        const status = ack === 4 ? 'read' : ack === 3 ? 'delivered' : ack === 2 ? 'sent' : 'pending';
+        
+        console.log(`📩 Message ${messageId} status updated to: ${status} (ack: ${ack})`);
+        
+        // Emit status update to update campaigns
+        (global as any).messageStatusUpdates = (global as any).messageStatusUpdates || new Map();
+        (global as any).messageStatusUpdates.set(messageId, {
+            status,
+            timestamp: new Date().toISOString(),
+            ack
+        });
+        
+        // Trigger a status update event that the campaign system can listen to
+        if (typeof (global as any).onMessageStatusUpdate === 'function') {
+            (global as any).onMessageStatusUpdate(messageId, status, msg);
+        }
+        
+    } catch (error) {
+        console.error('Error handling message status update:', error);
+    }
+});
+
 // Export helper functions
 export const isClientReady = () => isReady;
 export const isClientInitialized = () => isInitialized;
