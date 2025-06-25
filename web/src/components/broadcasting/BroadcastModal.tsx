@@ -3,14 +3,16 @@ import { ApiService } from '../../services/api';
 import { DynamicFilterOption } from '../../types';
 import TemplateSelector from '../TemplateSelector';
 import { MessagePreview } from '../MessagePreview';
-import  DocumentUpload from "../DocumentUpload"
+import FileUpload from '../FileUpload';
 
 interface BroadcastModalProps {
   onClose: () => void;
-  onSend: (campaignData: { message: string; campaignName: string; filters?: any }) => void;
+  onSend: (campaignData: { message: string; campaignName: string; filters?: any; file?: File | null }) => void;
+  attachedFile: File | null;
+  setAttachedFile: (file: File | null) => void;
 }
 
-export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend }) => {
+export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend, attachedFile, setAttachedFile }) => {
   const [message, setMessage] = useState('');
   const [campaignName, setCampaignName] = useState('');
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -19,7 +21,6 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
   const [previewCount, setPreviewCount] = useState(0);
   const [sampleContact, setSampleContact] = useState<any | null>(null);
   const [previewData, setPreviewData] = useState<{ preview: string; missingVars: string[] }>({ preview: '', missingVars: [] });
-  const [uploadedDoc, setUploadedDoc] = useState<File | null>(null);
 
   // Define MessageTemplate type (adjust fields as needed)
   type MessageTemplate = {
@@ -176,6 +177,13 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
     }));
   };
 
+  // Helper function to determine file type
+  const getFileType = (file: File): 'image' | 'document' => {
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    return imageExtensions.includes(ext) ? 'image' : 'document';
+  };
+
   const handleSend = async () => {
     if (!message.trim()) {
       alert('Please enter a message');
@@ -192,24 +200,49 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
       return;
     }
 
-    onSend({
-      message: message.trim(),
-      campaignName: campaignName.trim(),
-      filters: Object.keys(filters).length > 0 ? filters : undefined
-    });
-
-    if (uploadedDoc) {
-      try {
-        const res = await ApiService.uploadDocument(uploadedDoc);
-
-        if (!res.success) {
-          console.warn('Document upload failed:', res.error || 'Unknown error');
-          alert('Broadcast sent, but document upload failed.');
+    try {
+      // Determine how to send based on file type
+      if (attachedFile) {
+        const fileType = getFileType(attachedFile);
+        
+        if (fileType === 'image') {
+          // Send as image broadcast (existing functionality)
+          const result = await ApiService.startBroadcastWithImage({
+            message: message.trim(),
+            campaignName: campaignName.trim(),
+            filters: Object.keys(filters).length > 0 ? filters : undefined,
+            image: attachedFile
+          });
+          alert(`Campaign started! Broadcasting image to ${result.targets} contacts.`);
+        } else {
+          // Send as document broadcast 
+          const documentResult = await ApiService.uploadDocument(attachedFile);
+          if (!documentResult.success) {
+            alert('Document upload failed. Please try again.');
+            return;
+          }
+          
+          // Send text message first (documents are sent separately)
+          await onSend({
+            message: message.trim(),
+            campaignName: campaignName.trim(),
+            filters: Object.keys(filters).length > 0 ? filters : undefined
+          });
+          
+          alert(`Campaign started! Broadcasting message and document to ${previewCount} contacts.`);
         }
-      } catch (err) {
-        console.error('Document upload error:', err);
-        alert('Broadcast sent, but document upload encountered an error.');
+      } else {
+        // Send text-only broadcast
+        onSend({
+          message: message.trim(),
+          campaignName: campaignName.trim(),
+          filters: Object.keys(filters).length > 0 ? filters : undefined
+        });
+        alert(`Campaign started! Broadcasting to ${previewCount} contacts.`);
       }
+    } catch (error) {
+      console.error('Broadcast failed:', error);
+      alert('Failed to start broadcast. Please try again.');
     }
   };
 
@@ -279,11 +312,21 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
               </div>
             </div>
 
+            {/* File Upload - Images and Documents */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Attach Document (optional)
+                Attach File (optional)
               </label>
-              <DocumentUpload file={uploadedDoc} setFile={setUploadedDoc} />
+              <FileUpload onFileChange={setAttachedFile} selectedFile={attachedFile} />
+              {attachedFile && (
+                <div className="mt-2 text-xs text-gray-600">
+                  {getFileType(attachedFile) === 'image' ? (
+                    <span className="text-green-600">🖼️ Image will be sent with your message as caption</span>
+                  ) : (
+                    <span className="text-blue-600">📎 Document will be sent along with your message</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Filters */}
@@ -380,6 +423,6 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ onClose, onSend 
           </button>
         </div>
       </div>
-        </div>
+    </div>
   );
 }

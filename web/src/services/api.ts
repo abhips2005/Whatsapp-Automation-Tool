@@ -336,6 +336,39 @@ export class ApiService {
     const response = await api.post('/preview', { template, contact });
     return response.data;
   }
+
+ 
+
+    // Image Upload
+  static async uploadImage(file: File): Promise<{ filePath: string }> {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await api.post('/images/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+
+  // Broadcast with image
+  static async startBroadcastWithImage({ message, campaignName, filters, image }: { message: string; campaignName: string; filters?: any; image?: File | null }): Promise<BroadcastResponse> {
+    const formData = new FormData();
+    formData.append('message', message);
+    formData.append('campaignName', campaignName);
+    if (filters) {
+      formData.append('filters', JSON.stringify(filters));
+    }
+    if (image) {
+      formData.append('image', image);
+    }
+    const response = await api.post('/whatsapp/broadcast', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
 }
 
 // Error Handler Utility

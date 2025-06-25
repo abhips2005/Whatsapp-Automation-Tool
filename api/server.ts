@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import { whatsappClient, messageStatusDb } from '../source/message-tracker';
 import messageStatusRouter from './routes/message-status';
+import imagesRouter from './routes/images';
 
 // Import existing functionality
 import { dataZod, simplifiedDataZod } from '../script/validation';
@@ -124,6 +125,7 @@ app.use('/api/contacts', contactsRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api', documentRoutes);//Document sending
 app.use('/api/google-sheets', googleSheetsRoutes);
+app.use('/api/images', imagesRouter);
 
 // In-memory storage for campaigns and data
 let campaigns: Map<string, any> = new Map();
