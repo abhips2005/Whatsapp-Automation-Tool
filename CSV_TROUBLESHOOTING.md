@@ -16,7 +16,7 @@
 Ensure you've mapped these **required fields**:
 - `name` → Must map to a column with actual names
 - `email` → Must map to a column with valid email addresses  
-- `type` → Must map to a role/type column (or will default to 'participant')
+- `mobile number` → Must map to a mobile number column
 
 ##### **2. Verify CSV Data Quality**
 Your CSV should have:

@@ -15,6 +15,7 @@ import { Campaigns } from './Campaigns';
 
 
 
+
 export const Dashboard: React.FC = () => {
   const { subscribe, isConnected } = useWebSocket();
   const { setContacts, setCampaigns, updateCampaign } = useAppActions();
@@ -37,6 +38,7 @@ export const Dashboard: React.FC = () => {
     autoMessage: false,
     welcomeMessage: 'Welcome! You\'ve been added to our updates.'
   });
+  const [broadcastFile, setBroadcastFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
 
   // Initialize data
@@ -117,11 +119,20 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleBroadcastSend = async (campaignData: { message: string; campaignName: string; filters?: any }) => {
+  const handleBroadcastSend = async (campaignData: { message: string; campaignName: string; filters?: any; file?: File | null }) => {
     try {
-      const result = await ApiService.startBroadcast(campaignData);
-      setShowBroadcast(false);
-      alert(`Campaign started! Broadcasting to ${result.targets} contacts.`);
+      // The BroadcastModal now handles the file type detection and sending logic internally
+      // So we just need to handle text-only broadcasts here (when no file is attached)
+      if (!campaignData.file) {
+        const result = await ApiService.startBroadcast(campaignData);
+        setShowBroadcast(false);
+        setBroadcastFile(null);
+        alert(`Campaign started! Broadcasting to ${result.targets} contacts.`);
+      } else {
+        // File handling is done inside BroadcastModal, just close and reset
+        setShowBroadcast(false);
+        setBroadcastFile(null);
+      }
       
       // Refresh campaigns
       const campaignsData = await ApiService.getAllCampaigns();
@@ -392,8 +403,13 @@ export const Dashboard: React.FC = () => {
 
       {showBroadcast && (
         <BroadcastModal
-          onClose={() => setShowBroadcast(false)}
+          onClose={() => {
+            setShowBroadcast(false);
+            setBroadcastFile(null);
+          }}
           onSend={handleBroadcastSend}
+          attachedFile={broadcastFile}
+          setAttachedFile={setBroadcastFile}
         />
       )}
 
