@@ -1,7 +1,11 @@
 import React from 'react';
 import UserProfile from './UserProfile';
 
-const Header = ({ profilePicture }) => {
+interface HeaderProps {
+  profilePicture: string;
+}
+
+const Header = ({ profilePicture }: HeaderProps) => {
   return (
     <div>
       <UserProfile profilePicture={profilePicture} />

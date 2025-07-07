@@ -1,6 +1,10 @@
 import React from 'react';
 
-const UserProfile = ({ profilePicture }) => {
+interface UserProfileProps {
+  profilePicture: string;
+}
+
+const UserProfile = ({ profilePicture }: UserProfileProps) => {
   return (
     <div>
       <img src={profilePicture} alt="Profile Picture" />
